@@ -1,5 +1,6 @@
 from enum import Enum
 import random as rd
+import PySimpleGUI as sg
 
 class Color(Enum):
     BLACK = 0
@@ -96,12 +97,15 @@ class PlayerTileSet:
         else:
             return False
         
+class Gui:
+    None
+
 class TestClass:
     None
 
+NUMBER_OF_PLAYERS = 2
 tableTileSet = TableTileSet()
-allPlayers = [PlayerTileSet() for count in range(0, 3)] # Set number of players here
-lastPlayers = allPlayers
+allPlayers = [PlayerTileSet() for count in range(0, NUMBER_OF_PLAYERS)] # Set number of players here
 
 def InitGame():
     tableTileSet.InitTileSet()
@@ -133,7 +137,7 @@ def ShowOpponentStatus():
     for otherPlayer in otherPlayers:
         print(f"The tile list of Player {allPlayers.index(otherPlayer)} is")
         for index, tile in enumerate(otherPlayer.GetTileList()):
-            print(index, ' ', tile.opponentPrint())
+            print(index, ' ', tile.OpponentPrint())
 
 def MakeGuess():
     guessResult = player.MakeGuess(int(input('Target index: ')), int(input('Tile index: ')), int(input('Tile number: ')))
@@ -144,7 +148,7 @@ def MakeGuess():
 
 InitGame()
 
-while(True):
+while(IsOver() == False):
     lastPlayers = list(player for player in allPlayers if player.IsLose() == False)
     for player in lastPlayers:
         print(f"You are the player with index {allPlayers.index(player)}")
@@ -173,8 +177,35 @@ while(True):
             break
         print('Turn ends')
         print()
-        
-    if IsOver():
-            break
 
 IsOver(output=True)
+
+"""
+这段代码存在一些不规范之处，以下是一些潜在的问题和改进建议：
+
+1. **全局变量的使用**：`tableTileSet`, `allPlayers`, 和 `lastPlayers` 是作为全局变量定义的。这是一种不好的实践，因为它可能导致代码难以维护和理解。应该考虑将这些变量封装在一个类或函数中。
+
+2. **命名约定**：Python通常使用`snake_case`命名变量和函数，而类名使用`CamelCase`。例如，`InitGame`、`IsOver`、`ShowSelfStatus`、`ShowOpponentStatus` 和 `MakeGuess` 应该改为 `init_game`、`is_over`、`show_self_status`、`show_opponent_status` 和 `make_guess`。
+
+3. **魔法数字**：代码中有一些硬编码的数字（比如牌的数量12），这些应该被定义为常量，以提高代码的可读性和可维护性。
+
+4. **异常处理**：`MakeGuess` 函数在接收无效猜测时返回 `None`，但这不是一个好的异常处理方式。应该抛出一个异常，然后在调用该函数的地方处理这个异常。
+
+5. **代码重复**：`InitGame` 函数中的牌抽取代码与 `DrawTile` 方法非常相似，这表明可以重构以减少重复。
+
+6. **不一致的方法访问**：`Tile` 类中的 `OpponentPrint` 方法在调用时使用了不同的大小写（`opponentPrint`），这可能会导致运行时错误。
+
+8. **代码组织**：整个游戏逻辑都在全局作用域中执行，这不是一个好的实践。应该将游戏逻辑放入一个或多个函数中，或者更好的是，创建一个游戏类来封装所有的逻辑。
+
+9. **类型注解**：代码中使用了类型注解，这是一个好习惯，但是应该确保所有函数和方法都使用了类型注解以保持一致性。
+
+10. **硬编码的玩家数量**：玩家数量被硬编码为3，这应该作为一个可配置的参数。
+
+11. **注释和文档**：代码中几乎没有注释，这使得理解代码逻辑变得更加困难。应该添加适当的注释和文档字符串来解释每个类和方法的作用。
+
+12. **输入验证**：`MakeGuess` 函数直接从 `input` 读取值，而没有进行任何形式的验证。应该添加适当的验证来确保输入是有效的。
+
+14. **函数中的全局变量访问**：`ShowOpponentStatus` 和其他函数直接访问 `player` 变量，这可能不是全局定义的，会导致运行时错误。
+
+修正这些不规范的地方将使代码更加健壮、可维护和易于理解。
+"""
