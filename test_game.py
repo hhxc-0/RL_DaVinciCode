@@ -7,7 +7,7 @@ class TestClass:
     @pytest.fixture(params=[2, 3, 4])
     def setup_init(self, request):
         game_host = game.GameHost(request.param)
-        game_host.init_tile_sets()
+        game_host.init_game()
         return game_host
 
     def test_init(self, setup_init, request):

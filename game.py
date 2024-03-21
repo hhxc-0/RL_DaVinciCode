@@ -5,16 +5,12 @@ import PySimpleGUI as sg
 class InvalidGuessError(Exception):
     def __init__(self, message=None):
         self.message = message
-
-    def __str__(self):
-        return self.message
+        super().__init__(self.message)
     
 class EmptyTableError(Exception):
     def __init__(self, message=None):
         self.message = message
-
-    def __str__(self):
-        return self.message
+        super().__init__(self.message)
 
 class Tile:
     class Colors(Enum):
@@ -30,7 +26,7 @@ class Tile:
         self.number = number
         self.direction = direction
 
-    def __str__(self) -> None:
+    def __str__(self) -> str:
         return f"Color: {self.color.name}, Number: {self.number}, Direction: {self.direction.name}"
     
     def opponent_print(self) -> None:
@@ -109,17 +105,14 @@ class PlayerTileSet:
             self.temp_tile = None
         
     def is_lose(self) -> bool:
-        if len(list(private_tile for private_tile in self.tile_set if private_tile.direction == Tile.Directions.PRIVATE)) == 0:
-            return True
-        else:
-            return False
+        return not any(private_tile.direction == Tile.Directions.PRIVATE for private_tile in self.tile_set)
 
 class GameHost:
     def __init__(self, numPlayer) -> None:
         self.table_tile_set = TableTileSet()
         self.all_players = [PlayerTileSet() for count in range(0, numPlayer)] # Set number of players here
 
-    def init_tile_sets(self) -> None:
+    def init_game(self) -> None:
         self.table_tile_set.init_tile_set()
         for player in self.all_players:
             player.init_tile_set()
@@ -129,12 +122,12 @@ class GameHost:
 
     def is_game_over(self, output = False) -> bool:
         last_players = list(player for player in self.all_players if player.is_lose() == False)
-        for index, player in enumerate(self.all_players):
-            if len(last_players) <= 1:
-                if output:
-                    print(f"Game over, player {self.all_players.index(last_players[0])} wins")
-                return True
-        return False
+        if len(last_players) <= 1:
+            if output:
+                print(f"Game over, player {self.all_players.index(last_players[0])} wins")
+            return True
+        else:
+            return False
 
     def show_self_status(self, player) -> None:
         print(f"Your tile list is:")
@@ -149,7 +142,7 @@ class GameHost:
             for index, tile in enumerate(other_player.get_tile_list()):
                 print(index, ' ', tile.opponent_print())
 
-    def guesses_making_stage(self, player) -> None:
+    def guesses_making_stage(self, player) -> bool:
         while True:
             try:
                 guess_result = player.make_guess(self.all_players, int(input('Target index: ')), int(input('Tile index: ')), int(input('Tile number: ')))
@@ -158,7 +151,7 @@ class GameHost:
                 print('Invalid guess')
 
     def start_game(self) -> None:
-        self.init_tile_sets()
+        self.init_game()
 
         while(self.is_game_over() == False):
             last_players = list(player for player in self.all_players if player.is_lose() == False)
@@ -176,7 +169,7 @@ class GameHost:
 
                 print("Please make a guess")
                 guess_result = self.guesses_making_stage(player)
-                while(guess_result == True or guess_result == None):
+                while(guess_result == True):
                     if self.is_game_over():
                         break
                     print('Right guess, do another one or end your turn')
@@ -186,7 +179,7 @@ class GameHost:
                         player.end_turn()
                         break
                     else:
-                        guess_result = self.guesses_making_stage()
+                        guess_result = self.guesses_making_stage(player)
                 if self.is_game_over():
                     break
                 print('Turn ends')
