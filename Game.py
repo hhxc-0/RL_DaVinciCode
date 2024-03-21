@@ -12,7 +12,7 @@ class Direction(Enum):
     PUBLIC = 1
 
 class InvalidGuessError(Exception):
-    def __init__(self, message):
+    def __init__(self, message=None):
         self.message = message
 
     def __str__(self):
@@ -27,7 +27,7 @@ class Tile:
     def __str__(self) -> None:
         return f"Color: {self.color.name}, Number: {self.number}, Direction: {self.direction.name}"
     
-    def OpponentPrint(self) -> None:
+    def opponent_print(self) -> None:
         if self.direction == Direction.PRIVATE:
             return f"Color: {self.color.name}"
         else:
@@ -35,157 +35,157 @@ class Tile:
 
 class TableTileSet:
     def __init__(self) -> None:
-        self.tileSet = set()
+        self.tile_set = set()
 
-    def InitTileSet(self) -> None:
+    def init_tile_set(self) -> None:
         for color in Color:
             for number in range(0, 12):
                 tile = Tile(color, number)
-                self.tileSet.add(tile)
+                self.tile_set.add(tile)
 
 class PlayerTileSet:
     def __init__(self) -> None:
-        self.tileSet = set()
-        self.tempTile:Tile
+        self.tile_set = set()
+        self.temp_tile:Tile
 
-    def InitTileSet(self) -> None:
-        self.tileSet.clear()
+    def init_tile_set(self) -> None:
+        self.tile_set.clear()
 
-    def GetTileList(self) -> list[set]:
-        return sorted(list(self.tileSet), key=lambda x: x.number * 2 + x.color.value)
+    def get_tile_list(self) -> list[set]:
+        return sorted(list(self.tile_set), key=lambda x: x.number * 2 + x.color.value)
     
-    def DrawTile(self, tableTileSet, directDraw = False) -> bool:
-        if len(tableTileSet.tileSet) == 0:
+    def draw_tile(self, table_tile_set, direct_draw = False) -> bool:
+        if len(table_tile_set.tile_set) == 0:
             return False
         else:
-            tile = rd.choice(list(tableTileSet.tileSet))
-            if directDraw:
-                self.tileSet.add(tile)
+            tile = rd.choice(list(table_tile_set.tile_set))
+            if direct_draw:
+                self.tile_set.add(tile)
             else:
-                self.tempTile = tile
-            tableTileSet.tileSet.remove(tile)
+                self.temp_tile = tile
+            table_tile_set.tile_set.remove(tile)
             return True
             
     
-    def MakeGuess(self, targetIndex:int, tileIndex:int, tileNumber:int) -> bool:
-        if (targetIndex >= len(self.allPlayers) 
-            or targetIndex < 0 
-            or targetIndex == self.allPlayers.index(self)
-            or self.allPlayers[targetIndex].IsLose()
-            or tileNumber < 0
-            or tileNumber > 11):
+    def make_guess(self, all_players:list, target_index:int, tile_index:int, tile_number:int) -> bool:
+        if (target_index >= len(all_players) 
+            or target_index < 0 
+            or target_index == all_players.index(self)
+            or all_players[target_index].is_lose()
+            or tile_number < 0
+            or tile_number > 11):
             raise InvalidGuessError # invalid guess
-        guessTarget = self.allPlayers[targetIndex]
-        if tileIndex < 0 or tileIndex >= len(guessTarget.GetTileList()):
+        guessTarget = all_players[target_index]
+        if tile_index < 0 or tile_index >= len(guessTarget.get_tile_list()):
             raise InvalidGuessError # invalid guess
-        elif guessTarget.GetTileList()[tileIndex].direction == Direction.PUBLIC:
+        elif guessTarget.get_tile_list()[tile_index].direction == Direction.PUBLIC:
             raise InvalidGuessError # invalid guess
-        elif guessTarget.VerifyGuess(tileIndex, tileNumber):
+        elif guessTarget.verify_guess(tile_index, tile_number):
             return True # right guess
         else:
-            if self.tempTile != None:
-                self.tempTile.direction = Direction.PUBLIC
-                self.tileSet.add(self.tempTile)
-                self.tempTile = None
+            if self.temp_tile != None:
+                self.temp_tile.direction = Direction.PUBLIC
+                self.tile_set.add(self.temp_tile)
+                self.temp_tile = None
             return False # wrong guess
 
-    def VerifyGuess(self, tileIndex:int, tileNumber:int) -> bool:
-        tile = self.GetTileList()[tileIndex]
-        if tile.number == tileNumber:
+    def verify_guess(self, tile_index:int, tile_number:int) -> bool:
+        tile = self.get_tile_list()[tile_index]
+        if tile.number == tile_number:
             tile.direction = Direction.PUBLIC
             return True
         else:
             return False
         
-    def EndTurn(self) -> None:
-        if self.tempTile != None:
-            self.tempTile.direction = Direction.PRIVATE
-            self.tileSet.add(self.tempTile)
-            self.tempTile = None
+    def end_turn(self) -> None:
+        if self.temp_tile != None:
+            self.temp_tile.direction = Direction.PRIVATE
+            self.tile_set.add(self.temp_tile)
+            self.temp_tile = None
         
-    def IsLose(self) -> bool:
-        if len(list(privateTile for privateTile in self.tileSet if privateTile.direction == Direction.PRIVATE)) == 0:
+    def is_lose(self) -> bool:
+        if len(list(private_tile for private_tile in self.tile_set if private_tile.direction == Direction.PRIVATE)) == 0:
             return True
         else:
             return False
 
 class GameHost:
     def __init__(self, numPlayer) -> None:
-        self.tableTileSet = TableTileSet()
-        self.allPlayers = [PlayerTileSet() for count in range(0, numPlayer)] # Set number of players here
+        self.table_tile_set = TableTileSet()
+        self.all_players = [PlayerTileSet() for count in range(0, numPlayer)] # Set number of players here
 
-    def InitTileSets(self) -> None:
-        self.tableTileSet.InitTileSet()
-        for player in self.allPlayers:
-            player.InitTileSet()
-        for drawCount in range(0, 4):
-            for player in self.allPlayers:
-                player.DrawTile(self.tableTileSet, directDraw=True)
+    def init_tile_sets(self) -> None:
+        self.table_tile_set.init_tile_set()
+        for player in self.all_players:
+            player.init_tile_set()
+        for draw_count in range(0, 4):
+            for player in self.all_players:
+                player.draw_tile(self.table_tile_set, direct_draw=True)
 
-    def IsGameOver(self, output = False) -> bool:
-        lastPlayers = list(player for player in self.allPlayers if player.IsLose() == False)
-        for index, player in enumerate(self.allPlayers):
-            if len(lastPlayers) <= 1:
+    def is_gameover(self, output = False) -> bool:
+        last_players = list(player for player in self.all_players if player.is_lose() == False)
+        for index, player in enumerate(self.all_players):
+            if len(last_players) <= 1:
                 if output:
-                    print(f"Game over, player {self.allPlayers.index(lastPlayers[0])} wins")
+                    print(f"Game over, player {self.all_players.index(last_players[0])} wins")
                 return True
         return False
 
-    def ShowSelfStatus(self, player) -> None:
+    def show_self_status(self, player) -> None:
         print(f"Your tile list is:")
-        for tile in player.GetTileList():
+        for tile in player.get_tile_list():
             print(tile)
 
-    def ShowOpponentStatus(self, player) -> None:
-        otherPlayers = list(self.allPlayers)
-        otherPlayers.remove(player)
-        for otherPlayer in otherPlayers:
-            print(f"The tile list of Player {self.allPlayers.index(otherPlayer)} is")
-            for index, tile in enumerate(otherPlayer.GetTileList()):
-                print(index, ' ', tile.OpponentPrint())
+    def show_opponent_status(self, player) -> None:
+        other_players = list(self.all_players)
+        other_players.remove(player)
+        for other_player in other_players:
+            print(f"The tile list of Player {self.all_players.index(other_player)} is")
+            for index, tile in enumerate(other_player.get_tile_list()):
+                print(index, ' ', tile.opponent_print())
 
-    def MakeGuess(self, player) -> None:
+    def make_guess(self, player) -> None:
         while True:
             try:
-                guessResult = player.MakeGuess(int(input('Target index: ')), int(input('Tile index: ')), int(input('Tile number: ')))
-                return guessResult
+                guess_result = player.make_guess(self.all_players, int(input('Target index: ')), int(input('Tile index: ')), int(input('Tile number: ')))
+                return guess_result
             except InvalidGuessError:
                 print('Invalid guess')
 
-    def StartGame(self) -> None:
-        self.InitTileSets()
+    def start_game(self) -> None:
+        self.init_tile_sets()
 
-        while(self.IsGameOver() == False):
-            lastPlayers = list(player for player in self.allPlayers if player.IsLose() == False)
-            for player in lastPlayers:
-                print(f"You are the player with index {self.allPlayers.index(player)}")
-                self.ShowSelfStatus(player)
+        while(self.is_gameover() == False):
+            last_players = list(player for player in self.all_players if player.is_lose() == False)
+            for player in last_players:
+                print(f"You are the player with index {self.all_players.index(player)}")
+                self.show_self_status(player)
                 
-                self.ShowOpponentStatus(player)
+                self.show_opponent_status(player)
 
-                if player.DrawTile(self.tableTileSet):
-                    print(f"The tile you draw is {player.tempTile}")
+                if player.draw_tile(self.table_tile_set):
+                    print(f"The tile you draw is {player.temp_tile}")
                 else:
                     print('Unabled to draw, table is empty')
                 print("Please make a guess")
-                guessResult = self.MakeGuess(player)
-                while(guessResult == True or guessResult == None):
-                    if self.IsGameOver():
+                guess_result = self.make_guess(player)
+                while(guess_result == True or guess_result == None):
+                    if self.is_gameover():
                         break
                     print('Right guess, do another one or end your turn')
-                    self.ShowSelfStatus(player)
-                    self.ShowOpponentStatus(player)
+                    self.show_self_status(player)
+                    self.show_opponent_status(player)
                     if int(input('To end turn, input -1. To continue, input any other number: ')) == -1:
-                        player.EndTurn()
+                        player.end_turn()
                         break
                     else:
-                        guessResult = self.MakeGuess()
-                if self.IsGameOver():
+                        guess_result = self.make_guess()
+                if self.is_gameover():
                     break
                 print('Turn ends')
                 print()
 
-        self.IsGameOver(output=True)
+        self.is_gameover(output=True)
      
 class Gui:
     None
@@ -195,13 +195,13 @@ class TestClass:
 
 NUMBER_OF_PLAYERS = 2
 
-gameHost = GameHost(NUMBER_OF_PLAYERS)
-gameHost.StartGame()
+game_host = GameHost(NUMBER_OF_PLAYERS)
+game_host.start_game()
 
 """
 这段代码存在一些不规范之处，以下是一些潜在的问题和改进建议：
 
-2. **命名约定**：Python通常使用`snake_case`命名变量和函数，而类名使用`CamelCase`。例如，`self.InitGame`、`self.IsOver`、`self.ShowSelfStatus`、`self.ShowOpponentStatus` 和 `self.MakeGuess` 应该改为 `init_game`、`is_over`、`show_self_status`、`show_opponent_status` 和 `make_guess`。
+2. **命名约定**：Python通常使用`snake_case`命名变量和函数，而类名使用`CamelCase`。例如，`self.InitGame`、`self.IsOver`、`self.ShowSelfStatus`、`self.ShowOpponentStatus` 和 `self.make_guess` 应该改为 `init_game`、`is_over`、`show_self_status`、`show_opponent_status` 和 `make_guess`。
 
 11. **注释和文档**：代码中几乎没有注释，这使得理解代码逻辑变得更加困难。应该添加适当的注释和文档字符串来解释每个类和方法的作用。
 
