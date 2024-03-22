@@ -159,9 +159,9 @@ class Gui:
             panel = wx.Panel(self)
             panel.SetBackgroundColour(BACKGROUND_COLOR)
             
-            white_tile_bitmap = wx.Image("white_tile.png", wx.BITMAP_TYPE_PNG)
+            white_tile_bitmap = wx.Image("./assets/white_tile.png", wx.BITMAP_TYPE_PNG)
             white_tile_bitmap.Rescale(int(white_tile_bitmap.GetSize()[0] * TILE_SCALE), int(white_tile_bitmap.GetSize()[1] * TILE_SCALE))
-            black_tile_bitmap = wx.Image("black_tile.png", wx.BITMAP_TYPE_PNG)
+            black_tile_bitmap = wx.Image("./assets/black_tile.png", wx.BITMAP_TYPE_PNG)
             black_tile_bitmap.Rescale(int(black_tile_bitmap.GetSize()[0] * TILE_SCALE), int(black_tile_bitmap.GetSize()[1] * TILE_SCALE))
             
             vertical_sizer = wx.BoxSizer(wx.VERTICAL)
