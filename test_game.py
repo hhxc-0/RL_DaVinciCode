@@ -17,7 +17,7 @@ class TestClass:
         for player in game_host.all_players:
             assert len(player.tile_set) == game.INITIAL_TILES # test if the number of tiles drawn by each player is correct
     
-    def test_making_guesses(self, setup_init, request):
+    def test_making_guess(self, setup_init, request):
         game_host = setup_init
         number_players = request.node.callspec.params['setup_init']
         player_combs = list(itertools.permutations([player_index for player_index in range(0, number_players)], 2))
@@ -38,6 +38,12 @@ class TestClass:
             with pytest.raises(game.InvalidGuessError): # test the exception with tile index higher than bound
                 game_host.all_players[player_comb[0]].make_guess(game_host.all_players, player_comb[1], len(game_host.all_players[player_comb[1]].tile_set)+1, rd.randint(0, game.MAX_TILE_NUMBER))
                 #game_host.all_players[0].make_guess(all_players: list, target_index: int, tile_index: int, tile_number: int)
+    
+    def test_guess_validation(self, setup_init, request):
+        game_host = setup_init
+        number_players = request.node.callspec.params['setup_init']
+        
+        # TODO: add tests for successful guessing
 
     def test_empty_table_draw(self, setup_init, request):
         game_host = setup_init

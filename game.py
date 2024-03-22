@@ -1,6 +1,9 @@
 from enum import Enum
+import copy
 import random as rd
-import PySimpleGUI as sg
+# import streamlit as st
+# import PySimpleGUI as sg
+import wx
 
 class InvalidGuessError(Exception):
     def __init__(self, message=None):
@@ -106,6 +109,71 @@ class PlayerTileSet:
         
     def is_lose(self) -> bool:
         return not any(private_tile.direction == Tile.Directions.PRIVATE for private_tile in self.tile_set)
+     
+class Gui:
+    def __init__(self) -> None:
+        self.app = wx.App()
+
+    def input_guess(self):
+        # self.frame.Refresh()
+        self.frame = self.MainFrame()
+        self.app.MainLoop()
+
+    class MainFrame(wx.Frame):
+        def __init__(self):
+            BACKGROUND_COLOR = wx.Colour(192, 192, 192)
+            BACKGROUND_COLOR = wx.Colour(255, 255, 255)
+            TILE_SCALE = 0.5
+            TEXT_FONT = wx.Font(int(60 * TILE_SCALE), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, 'Segoe UI')
+            TILE_NUMBER_FONT = wx.Font(int(60 * TILE_SCALE), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, 'Segoe UI')
+
+            super().__init__(None, title="The Da Vinci Code", size=(300, 200))
+            
+            panel = wx.Panel(self)
+            panel.SetBackgroundColour(BACKGROUND_COLOR)
+            
+            white_tile_bitmap = wx.Image("white_tile.png", wx.BITMAP_TYPE_PNG)
+            white_tile_bitmap.Rescale(int(white_tile_bitmap.GetSize()[0] * TILE_SCALE), int(white_tile_bitmap.GetSize()[1] * TILE_SCALE))
+            black_tile_bitmap = wx.Image("black_tile.png", wx.BITMAP_TYPE_PNG)
+            black_tile_bitmap.Rescale(int(black_tile_bitmap.GetSize()[0] * TILE_SCALE), int(black_tile_bitmap.GetSize()[1] * TILE_SCALE))
+            
+            vertical_sizer = wx.BoxSizer(wx.VERTICAL)
+            self.tile_button_dict = {}
+            for player in game_host.all_players:
+                player_index_text = wx.StaticText(panel, wx.NewId(), f"Tiles of player {game_host.all_players.index(player):}")
+                player_index_text.SetFont(TEXT_FONT)
+                vertical_sizer.Add(player_index_text, 0, wx.ALL, 5)   
+
+                horizontal_sizer = wx.BoxSizer(wx.HORIZONTAL)
+                for tile in player.tile_set:
+                    if tile.color == Tile.Colors.WHITE:
+                        temp_bitmap = white_tile_bitmap.ConvertToBitmap()
+                    elif tile.color == Tile.Colors.BLACK:
+                        temp_bitmap = black_tile_bitmap.ConvertToBitmap()
+                    
+                    # 在位图上绘制文字
+                    dc = wx.MemoryDC(temp_bitmap)
+                    dc.SetTextForeground(wx.Colour(0, 0, 0, 256))  # 设置文字颜色
+                    dc.SetFont(TILE_NUMBER_FONT)  # 设置文字字体
+                    text = str(tile.number)
+                    tw, th = dc.GetTextExtent(text)  # 获取文字的宽度和高度
+                    dc.DrawText(text, (temp_bitmap.GetWidth() - tw) // 2, (temp_bitmap.GetHeight() - th) // 2)  # 将文字绘制到位图上
+                    dc.SelectObject(wx.NullBitmap)  # 结束绘图
+
+                    tile_botton_id = wx.NewId()
+                    tile_botton = wx.BitmapButton(panel, tile_botton_id, bitmap=temp_bitmap, style=wx.BORDER_NONE)
+                    self.tile_button_dict[tile_botton_id] = (player, tile)
+                    tile_botton.SetBackgroundColour(BACKGROUND_COLOR)
+                    self.Bind(wx.EVT_BUTTON, self.on_button_click, tile_botton)
+                    horizontal_sizer.Add(tile_botton, 0, wx.ALL, 5)
+                vertical_sizer.Add(horizontal_sizer, 0, wx.ALL, 5)        
+            panel.SetSizer(vertical_sizer)
+            del dc
+            self.Show()
+        
+        def on_button_click(self, event):
+            button_id = event.GetId()
+            wx.MessageBox(f"Button {self.tile_button_dict[button_id]} Clicked!", "Info", wx.OK | wx.ICON_INFORMATION)
 
 class GameHost:
     def __init__(self, numPlayer) -> None:
@@ -113,6 +181,7 @@ class GameHost:
         self.all_players = [PlayerTileSet() for count in range(0, numPlayer)] # Set number of players here
 
     def init_game(self) -> None:
+        self.gui = Gui()
         self.table_tile_set.init_tile_set()
         for player in self.all_players:
             player.init_tile_set()
@@ -160,6 +229,7 @@ class GameHost:
                 self.show_self_status(player)
                 
                 self.show_opponent_status(player)
+                self.gui.input_guess()
 
                 try:
                     player.draw_tile(self.table_tile_set)
@@ -186,9 +256,6 @@ class GameHost:
                 print()
 
         self.is_game_over(output=True)
-     
-class Gui:
-    None
 
 NUMBER_OF_PLAYERS = 3
 MAX_TILE_NUMBER = 11
