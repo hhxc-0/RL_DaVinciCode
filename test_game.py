@@ -4,6 +4,9 @@ import random as rd
 import game
 
 class TestClass:
+    """
+    This class is used for pytest testing
+    """
     @pytest.fixture(params=[2, 3, 4])
     def setup_init(self, request):
         game_host = game.GameHost(request.param)

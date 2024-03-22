@@ -1,5 +1,4 @@
 from enum import Enum
-import copy
 import random as rd
 # import streamlit as st
 # import PySimpleGUI as sg
@@ -39,6 +38,15 @@ class Tile:
             return f"Color: {self.color.name}, Number: {self.number}"
 
 class TableTileSet:
+    """
+    This class is used to store the tiles that are on the table (not yet drawn by players)
+
+    Attributes:
+        tile_set (set[Tile]): The set of tiles on the table
+
+    Methods:
+        init_tile_set: Set the tile_set into two sets, one black and one white, with tile numbers ranging from 0 to MAX_TILE_NUMBER
+    """
     def __init__(self) -> None:
         self.tile_set = set()
 
@@ -49,6 +57,22 @@ class TableTileSet:
                 self.tile_set.add(tile)
 
 class PlayerTileSet:
+    """
+    This class is used to store the tiles that are owned by the player and perform actions to the tiles
+
+    Attributes:
+        tile_set (set[Tile]): The set of tiles owned by the player
+        temp_tile (Tile): The tile just drawn by the player and not yet placed into the tile set
+
+    Methods:
+        init_tile_set: Set the tile_set empty
+        get_tile_list: Get the sorted list of tiles
+        draw_tile: Draw a tile and set it the temp_tile if direct_draw = False (by default), draw a tile and put it directly into the tile_set if direct_draw = True
+        make_guess: Make a guess on one of the private tiles owned by other player(s)
+        verify_guess: Verify the guess made by other players
+        end_turn: The player decide to end their's turn actively
+        is_lose: Test if the player loses the game
+    """
     def __init__(self) -> None:
         self.tile_set = set()
         self.temp_tile = None
@@ -111,6 +135,9 @@ class PlayerTileSet:
         return not any(private_tile.direction == Tile.Directions.PRIVATE for private_tile in self.tile_set)
      
 class Gui:
+    """
+    This class hosts the GUI
+    """
     def __init__(self) -> None:
         self.app = wx.App()
 
@@ -176,6 +203,21 @@ class Gui:
             wx.MessageBox(f"Button {self.tile_button_dict[button_id]} Clicked!", "Info", wx.OK | wx.ICON_INFORMATION)
 
 class GameHost:
+    """
+    This class performs the game flow
+
+    Attributes:
+        table_tile_set (TableTileSet): A set of tiles on the table
+        all_players (list[PlayerTileSet]): A list of player instances
+    
+    Methods:
+        init_game: Initialize everything about the game
+        is_game_over: Test if the winner appears
+        show_self_status: Display the status of the player
+        show_opponent_status: Display the status of other players
+        guesses_making_stage: Allow the player to make guesses
+        start_game: Run the main game routine
+    """
     def __init__(self, numPlayer) -> None:
         self.table_tile_set = TableTileSet()
         self.all_players = [PlayerTileSet() for count in range(0, numPlayer)] # Set number of players here
