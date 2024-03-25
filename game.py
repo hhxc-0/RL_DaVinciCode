@@ -1,18 +1,7 @@
 from enum import Enum
 import random as rd
-# import streamlit as st
-# import PySimpleGUI as sg
-import wx
-
-class InvalidGuessError(Exception):
-    def __init__(self, message=None):
-        self.message = message
-        super().__init__(self.message)
-    
-class EmptyTableError(Exception):
-    def __init__(self, message=None):
-        self.message = message
-        super().__init__(self.message)
+import streamlit as st
+from st_clickable_images import clickable_images
 
 class Tile:
     class Colors(Enum):
@@ -85,7 +74,7 @@ class PlayerTileSet:
     
     def draw_tile(self, table_tile_set, direct_draw = False) -> None:
         if len(table_tile_set.tile_set) == 0:
-            raise EmptyTableError
+            raise ValueError('Empty table error')
         else:
             tile = rd.choice(list(table_tile_set.tile_set))
             if direct_draw:
@@ -97,17 +86,17 @@ class PlayerTileSet:
     
     def make_guess(self, all_players:list, target_index:int, tile_index:int, tile_number:int) -> bool:
         if (target_index >= len(all_players) 
-            or target_index < 0 
+            or target_index < 0
             or target_index == all_players.index(self)
             or all_players[target_index].is_lose()
             or tile_number < 0
             or tile_number > MAX_TILE_NUMBER):
-            raise InvalidGuessError # invalid guess
+            raise ValueError('invalid guess')
         guessTarget = all_players[target_index]
         if tile_index < 0 or tile_index >= len(guessTarget.get_tile_list()):
-            raise InvalidGuessError # invalid guess
+            raise ValueError('invalid guess')
         elif guessTarget.get_tile_list()[tile_index].direction == Tile.Directions.PUBLIC:
-            raise InvalidGuessError # invalid guess
+            raise ValueError('invalid guess')
         elif guessTarget.verify_guess(tile_index, tile_number):
             return True # right guess
         else:
@@ -134,74 +123,6 @@ class PlayerTileSet:
     def is_lose(self) -> bool:
         return not any(private_tile.direction == Tile.Directions.PRIVATE for private_tile in self.tile_set)
      
-class Gui:
-    """
-    This class hosts the GUI
-    """
-    def __init__(self) -> None:
-        self.app = wx.App()
-
-    def input_guess(self):
-        # self.frame.Refresh()
-        self.frame = self.MainFrame()
-        self.app.MainLoop()
-
-    class MainFrame(wx.Frame):
-        def __init__(self):
-            BACKGROUND_COLOR = wx.Colour(192, 192, 192)
-            BACKGROUND_COLOR = wx.Colour(255, 255, 255)
-            TILE_SCALE = 0.5
-            TEXT_FONT = wx.Font(int(60 * TILE_SCALE), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, 'Segoe UI')
-            TILE_NUMBER_FONT = wx.Font(int(60 * TILE_SCALE), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, 'Segoe UI')
-
-            super().__init__(None, title="The Da Vinci Code", size=(300, 200))
-            
-            panel = wx.Panel(self)
-            panel.SetBackgroundColour(BACKGROUND_COLOR)
-            
-            white_tile_bitmap = wx.Image("./assets/white_tile.png", wx.BITMAP_TYPE_PNG)
-            white_tile_bitmap.Rescale(int(white_tile_bitmap.GetSize()[0] * TILE_SCALE), int(white_tile_bitmap.GetSize()[1] * TILE_SCALE))
-            black_tile_bitmap = wx.Image("./assets/black_tile.png", wx.BITMAP_TYPE_PNG)
-            black_tile_bitmap.Rescale(int(black_tile_bitmap.GetSize()[0] * TILE_SCALE), int(black_tile_bitmap.GetSize()[1] * TILE_SCALE))
-            
-            vertical_sizer = wx.BoxSizer(wx.VERTICAL)
-            self.tile_button_dict = {}
-            for player in game_host.all_players:
-                player_index_text = wx.StaticText(panel, wx.NewId(), f"Tiles of player {game_host.all_players.index(player):}")
-                player_index_text.SetFont(TEXT_FONT)
-                vertical_sizer.Add(player_index_text, 0, wx.ALL, 5)   
-
-                horizontal_sizer = wx.BoxSizer(wx.HORIZONTAL)
-                for tile in player.tile_set:
-                    if tile.color == Tile.Colors.WHITE:
-                        temp_bitmap = white_tile_bitmap.ConvertToBitmap()
-                    elif tile.color == Tile.Colors.BLACK:
-                        temp_bitmap = black_tile_bitmap.ConvertToBitmap()
-                    
-                    # 在位图上绘制文字
-                    dc = wx.MemoryDC(temp_bitmap)
-                    dc.SetTextForeground(wx.Colour(0, 0, 0, 256))  # 设置文字颜色
-                    dc.SetFont(TILE_NUMBER_FONT)  # 设置文字字体
-                    text = str(tile.number)
-                    tw, th = dc.GetTextExtent(text)  # 获取文字的宽度和高度
-                    dc.DrawText(text, (temp_bitmap.GetWidth() - tw) // 2, (temp_bitmap.GetHeight() - th) // 2)  # 将文字绘制到位图上
-                    dc.SelectObject(wx.NullBitmap)  # 结束绘图
-
-                    tile_botton_id = wx.NewId()
-                    tile_botton = wx.BitmapButton(panel, tile_botton_id, bitmap=temp_bitmap, style=wx.BORDER_NONE)
-                    self.tile_button_dict[tile_botton_id] = (player, tile)
-                    tile_botton.SetBackgroundColour(BACKGROUND_COLOR)
-                    self.Bind(wx.EVT_BUTTON, self.on_button_click, tile_botton)
-                    horizontal_sizer.Add(tile_botton, 0, wx.ALL, 5)
-                vertical_sizer.Add(horizontal_sizer, 0, wx.ALL, 5)        
-            panel.SetSizer(vertical_sizer)
-            del dc
-            self.Show()
-        
-        def on_button_click(self, event):
-            button_id = event.GetId()
-            wx.MessageBox(f"Button {self.tile_button_dict[button_id]} Clicked!", "Info", wx.OK | wx.ICON_INFORMATION)
-
 class GameHost:
     """
     This class performs the game flow
@@ -223,7 +144,6 @@ class GameHost:
         self.all_players = [PlayerTileSet() for count in range(0, numPlayer)] # Set number of players here
 
     def init_game(self) -> None:
-        self.gui = Gui()
         self.table_tile_set.init_tile_set()
         for player in self.all_players:
             player.init_tile_set()
@@ -231,7 +151,7 @@ class GameHost:
             for player in self.all_players:
                 player.draw_tile(self.table_tile_set, direct_draw=True)
 
-    def is_game_over(self, output = False) -> bool:
+    def is_game_over(self, output = False) -> bool: # TODO: remove print output and use GUI
         last_players = list(player for player in self.all_players if player.is_lose() == False)
         if len(last_players) <= 1:
             if output:
@@ -240,28 +160,28 @@ class GameHost:
         else:
             return False
 
-    def show_self_status(self, player) -> None:
-        print(f"Your tile list is:")
-        for tile in player.get_tile_list():
-            print(tile)
+    # def show_self_status(self, player) -> None:
+    #     print(f"Your tile list is:")
+    #     for tile in player.get_tile_list():
+    #         print(tile)
 
-    def show_opponent_status(self, player) -> None:
-        other_players = list(self.all_players)
-        other_players.remove(player)
-        for other_player in other_players:
-            print(f"The tile list of Player {self.all_players.index(other_player)} is")
-            for index, tile in enumerate(other_player.get_tile_list()):
-                print(index, ' ', tile.opponent_print())
+    # def show_opponent_status(self, player) -> None:
+    #     other_players = list(self.all_players)
+    #     other_players.remove(player)
+    #     for other_player in other_players:
+    #         print(f"The tile list of Player {self.all_players.index(other_player)} is")
+    #         for index, tile in enumerate(other_player.get_tile_list()):
+    #             print(index, ' ', tile.opponent_print())
 
-    def guesses_making_stage(self, player) -> bool:
+    def guesses_making_stage(self, player) -> bool: # TODO: Remove this method and put all the input into App class
         while True:
             try:
                 guess_result = player.make_guess(self.all_players, int(input('Target index: ')), int(input('Tile index: ')), int(input('Tile number: ')))
                 return guess_result
-            except InvalidGuessError:
+            except ValueError:
                 print('Invalid guess')
 
-    def start_game(self) -> None:
+    def start_game(self) -> None: # TODO: Remove this method and put all the logic into App class
         self.init_game()
 
         while(self.is_game_over() == False):
@@ -269,14 +189,12 @@ class GameHost:
             for player in last_players:
                 print(f"You are the player with index {self.all_players.index(player)}")
                 self.show_self_status(player)
-                
                 self.show_opponent_status(player)
-                self.gui.input_guess()
 
                 try:
                     player.draw_tile(self.table_tile_set)
                     print(f"The tile you draw is {player.temp_tile}")
-                except EmptyTableError:
+                except ValueError:
                     print('Unabled to draw, table is empty')
 
                 print("Please make a guess")
@@ -299,10 +217,165 @@ class GameHost:
 
         self.is_game_over(output=True)
 
+class App:
+    """
+    This class hosts the GUI
+    """
+
+    def __init__(self) -> None:
+        self.game_stage:self.GameStage
+        self.current_player:PlayerTileSet
+
+    class GameStage(Enum):
+        UNINITIALIZED = 0
+        INTERACTING = 1
+        GAME_OVER = 2
+
+    def restore_session(self) -> None:
+        if 'game_stage' not in st.session_state:
+            st.session_state.game_stage = self.GameStage.UNINITIALIZED
+        
+        self.game_stage = st.session_state.game_stage
+        match self.game_stage.value:
+            case self.GameStage.UNINITIALIZED.value:
+                self.init_game()
+
+            case self.GameStage.INTERACTING.value:
+                self.current_player = st.session_state.current_player
+                game_host.table_tile_set = st.session_state.table_tile_set
+                game_host.all_players = st.session_state.all_players
+                self.interact_page = self.InteractPage(self)
+                self.interact_page.show_interact_page(self.current_player)
+
+            case self.GameStage.GAME_OVER.value:
+                self.show_game_over_page()
+
+            case _:
+                raise ValueError
+
+    def init_game(self) -> None:
+        game_host.init_game()
+        self.game_stage = self.GameStage.INTERACTING
+        self.current_player = game_host.all_players[0]
+        self.store_session()
+        st.rerun()
+
+    class InteractPage:
+        def __init__(self, app_self) -> None:
+            self.app_self = app_self
+            self.tile_assets = self.TileAssets()
+
+        class TileAssets:
+            """
+            This class is used to store the URL of assets
+            """
+            # @st.cache_resource
+            def __init__(self) -> None:
+                self.white_tile_asset = 'https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/white_tile.png?raw=true'
+                self.black_tile_asset = 'https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/black_tile.png?raw=true'
+                self.white_tile_assets = []
+                self.black_tile_assets = []
+                for tile_color in ('white_tile', 'black_tile'):
+                    if tile_color == 'white_tile':
+                        asset_list = self.white_tile_assets
+                    else:
+                        asset_list = self.black_tile_assets
+
+                    for tile_number in range(0, MAX_TILE_NUMBER + 1):
+                        asset_list.append('https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/' + tile_color + '_' + str(tile_number) + '.png?raw=true')
+
+        def show_interact_page(self, player:PlayerTileSet) -> None:
+            st.markdown('## The Da Vinci Code Game')
+
+            tile_buttons = {}
+            tile_row = []
+            st.markdown(f'### Tiles of player {game_host.all_players.index(player)} (you):')
+            for tile in player.get_tile_list():
+                if tile.color.value == Tile.Colors.WHITE.value:
+                    tile_row.append(self.tile_assets.white_tile_assets[tile.number])
+                else:
+                    tile_row.append(self.tile_assets.black_tile_assets[tile.number])
+            tile_buttons[player] = (
+                clickable_images(
+                    tile_row,
+                    titles=[f"Image #{str(i)}" for i in range(len(tile_row))],
+                    div_style={"display": "flex", "justify-content": "center", "flex-wrap": "wrap"},
+                    img_style={"margin": "5px", "height": "200px"},
+                    key=game_host.all_players.index(player)
+                )
+            )
+
+            other_players = list(game_host.all_players)
+            other_players.remove(player)
+            for other_player in other_players:
+                st.markdown(f'### Tiles of player {game_host.all_players.index(other_player)}:')
+                tile_row = []
+                for tile in other_player.get_tile_list():
+                    if tile.color.value == Tile.Colors.WHITE.value:
+                        if tile.direction.value == Tile.Directions.PRIVATE.value:
+                            tile_row.append(self.tile_assets.white_tile_asset)
+                        else:
+                            tile_row.append(self.tile_assets.white_tile_assets[tile.number])
+                    else:
+                        if tile.direction.value == Tile.Directions.PRIVATE.value:
+                            tile_row.append(self.tile_assets.black_tile_asset)
+                        else:
+                            tile_row.append(self.tile_assets.black_tile_assets[tile.number])
+
+                tile_buttons[other_player] = (
+                    clickable_images(
+                        tile_row,
+                        titles=[f"Image #{str(i)}" for i in range(len(tile_row))],
+                        div_style={"display": "flex", "justify-content": "center", "flex-wrap": "wrap"},
+                        img_style={"margin": "5px", "height": "200px"},
+                        key=game_host.all_players.index(other_player)
+                    )
+                )
+
+            # st.markdown('## Please enter a number here and click on a tile to guess')
+            guess_number = st.number_input('Please enter a number here and click on a tile to guess', min_value=0, max_value=MAX_TILE_NUMBER, value=0, step=1)
+
+            for other_player in other_players:
+                if tile_buttons[other_player] > -1:
+                    try:
+                        st.write(game_host.all_players.index(other_player), tile_buttons[other_player], guess_number)
+                        guess_result = player.make_guess(game_host.all_players, game_host.all_players.index(other_player), tile_buttons[other_player], guess_number)
+                        if guess_result == True:
+                            st.markdown('### Right guess')
+                            self.app_self.store_session()
+                        else:
+                            if game_host.all_players.index(self.app_self.current_player) < NUMBER_OF_PLAYERS - 1:
+                                self.app_self.current_player = game_host.all_players[game_host.all_players.index(self.app_self.current_player) + 1]
+                            else:
+                                self.app_self.current_player = game_host.all_players[0]
+                            self.app_self.store_session()
+                        st.rerun()
+                    except ValueError:
+                        st.markdown('### Invalid guess')
+            self.app_self.store_session()
+
+    def show_game_over_page(self) -> None:
+        pass
+
+    def store_session(self) -> None:
+        st.session_state.game_stage = self.game_stage
+        match self.game_stage.value:
+            case self.GameStage.UNINITIALIZED.value:
+                pass
+
+            case self.GameStage.INTERACTING.value:
+                st.session_state.current_player = self.current_player
+                st.session_state.table_tile_set = game_host.table_tile_set
+                st.session_state.all_players = game_host.all_players
+                
+            case self.GameStage.GAME_OVER.value:
+                pass
+
 NUMBER_OF_PLAYERS = 3
 MAX_TILE_NUMBER = 11
 INITIAL_TILES = 4
 
 if __name__ == '__main__':
     game_host = GameHost(NUMBER_OF_PLAYERS)
-    game_host.start_game()
+    app = App()
+    app.restore_session()
