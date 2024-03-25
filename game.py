@@ -1,7 +1,9 @@
 from enum import Enum
 import random as rd
+import uuid
 import streamlit as st
 from st_clickable_images import clickable_images
+from streamlit_image_select import image_select
 
 class Tile:
     class Colors(Enum):
@@ -322,13 +324,16 @@ class App:
                         else:
                             tile_row.append(self.tile_assets.black_tile_assets[tile.number])
 
+                if 'button_keys' not in st.session_state:
+                    st.session_state.button_keys = {i:(i+1)*(10**10) for i in range(NUMBER_OF_PLAYERS)}
                 tile_buttons[other_player] = (
                     clickable_images(
                         tile_row,
                         titles=[f"Image #{str(i)}" for i in range(len(tile_row))],
                         div_style={"display": "flex", "justify-content": "center", "flex-wrap": "wrap"},
                         img_style={"margin": "5px", "height": "200px"},
-                        key=game_host.all_players.index(other_player)
+                        # key=game_host.all_players.index(other_player)
+                        key=st.session_state.button_keys[game_host.all_players.index(other_player)]
                     )
                 )
 
@@ -337,6 +342,7 @@ class App:
 
             for other_player in other_players:
                 if tile_buttons[other_player] > -1:
+                    st.session_state.button_keys[game_host.all_players.index(other_player)] = st.session_state.button_keys[game_host.all_players.index(other_player)] + 1
                     try:
                         st.write(game_host.all_players.index(other_player), tile_buttons[other_player], guess_number)
                         guess_result = player.make_guess(game_host.all_players, game_host.all_players.index(other_player), tile_buttons[other_player], guess_number)
