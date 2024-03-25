@@ -160,7 +160,18 @@ class GameHost:
 
 class App:
     """
-    This class hosts the GUI
+    This class hosts the GUI and the game logic
+
+    Attributes:
+        game_stage(self.GameStage): Used to store the current game stage
+        current_player(PlayerTileSet): Store the player currently interacting during the INTERACTING stage
+        abled_2_end_turn(bool): Indicates whether the current player is able to end their turn
+    
+    Methods:
+        restore_session: Restore the state variables from st.session_state
+        init_game: Initalize the game and the state variables
+        show_game_over_page: Show the game over page
+        store_session: Store the state variables into st.session_state
     """
 
     def __init__(self) -> None:
@@ -206,6 +217,18 @@ class App:
         st.rerun()
 
     class InteractPage:
+        """
+        This class is used to perform the game logic and GUI interactions during INTERACTING stage
+
+        Attributes:
+            app_self: self of the outer class
+            tile_assets(self.Assets): A instance of self.Assets, used to store the URL of assets
+
+        Methods:
+            append_tile_row: Append a tile asset into a row of tiles
+            next_player: Set current_player the next player
+            show_interact_page: Show the interaction page and perform the game logic
+        """
         def __init__(self, app_self) -> None:
             self.app_self = app_self
             self.tile_assets = self.Assets()
