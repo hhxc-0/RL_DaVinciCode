@@ -1,9 +1,7 @@
 from enum import Enum
 import random as rd
-import uuid
 import streamlit as st
 from st_clickable_images import clickable_images
-from streamlit_image_select import image_select
 
 class Tile:
     class Colors(Enum):
@@ -123,7 +121,7 @@ class PlayerTileSet:
             self.temp_tile = None
         
     def is_lose(self) -> bool:
-        return not any(private_tile.direction == Tile.Directions.PRIVATE for private_tile in self.tile_set)
+        return not any(tile.direction == Tile.Directions.PRIVATE for tile in self.tile_set)
      
 class GameHost:
     """
@@ -153,71 +151,12 @@ class GameHost:
             for player in self.all_players:
                 player.draw_tile(self.table_tile_set, direct_draw=True)
 
-    def is_game_over(self, output = False) -> bool: # TODO: remove print output and use GUI
+    def is_game_over(self) -> bool:
         last_players = list(player for player in self.all_players if player.is_lose() == False)
         if len(last_players) <= 1:
-            if output:
-                print(f"Game over, player {self.all_players.index(last_players[0])} wins")
             return True
         else:
             return False
-
-    # def show_self_status(self, player) -> None:
-    #     print(f"Your tile list is:")
-    #     for tile in player.get_tile_list():
-    #         print(tile)
-
-    # def show_opponent_status(self, player) -> None:
-    #     other_players = list(self.all_players)
-    #     other_players.remove(player)
-    #     for other_player in other_players:
-    #         print(f"The tile list of Player {self.all_players.index(other_player)} is")
-    #         for index, tile in enumerate(other_player.get_tile_list()):
-    #             print(index, ' ', tile.opponent_print())
-
-    def guesses_making_stage(self, player) -> bool: # TODO: Remove this method and put all the input into App class
-        while True:
-            try:
-                guess_result = player.make_guess(self.all_players, int(input('Target index: ')), int(input('Tile index: ')), int(input('Tile number: ')))
-                return guess_result
-            except ValueError:
-                print('Invalid guess')
-
-    def start_game(self) -> None: # TODO: Remove this method and put all the logic into App class
-        self.init_game()
-
-        while(self.is_game_over() == False):
-            last_players = list(player for player in self.all_players if player.is_lose() == False)
-            for player in last_players:
-                print(f"You are the player with index {self.all_players.index(player)}")
-                self.show_self_status(player)
-                self.show_opponent_status(player)
-
-                try:
-                    player.draw_tile(self.table_tile_set)
-                    print(f"The tile you draw is {player.temp_tile}")
-                except ValueError:
-                    print('Unabled to draw, table is empty')
-
-                print("Please make a guess")
-                guess_result = self.guesses_making_stage(player)
-                while(guess_result == True):
-                    if self.is_game_over():
-                        break
-                    print('Right guess, do another one or end your turn')
-                    self.show_self_status(player)
-                    self.show_opponent_status(player)
-                    if int(input('To end turn, input -1. To continue, input any other number: ')) == -1:
-                        player.end_turn()
-                        break
-                    else:
-                        guess_result = self.guesses_making_stage(player)
-                if self.is_game_over():
-                    break
-                print('Turn ends')
-                print()
-
-        self.is_game_over(output=True)
 
 class App:
     """
@@ -227,6 +166,7 @@ class App:
     def __init__(self) -> None:
         self.game_stage:self.GameStage
         self.current_player:PlayerTileSet
+        self.abled_2_end_turn:bool
 
     class GameStage(Enum):
         UNINITIALIZED = 0
@@ -246,10 +186,12 @@ class App:
                 self.current_player = st.session_state.current_player
                 game_host.table_tile_set = st.session_state.table_tile_set
                 game_host.all_players = st.session_state.all_players
+                self.abled_2_end_turn = st.session_state.abled_2_end_turn
                 self.interact_page = self.InteractPage(self)
                 self.interact_page.show_interact_page(self.current_player)
 
             case self.GameStage.GAME_OVER.value:
+                game_host.all_players = st.session_state.all_players
                 self.show_game_over_page()
 
             case _:
@@ -259,20 +201,22 @@ class App:
         game_host.init_game()
         self.game_stage = self.GameStage.INTERACTING
         self.current_player = game_host.all_players[0]
+        self.abled_2_end_turn = False
         self.store_session()
         st.rerun()
 
     class InteractPage:
         def __init__(self, app_self) -> None:
             self.app_self = app_self
-            self.tile_assets = self.TileAssets()
+            self.tile_assets = self.Assets()
 
-        class TileAssets:
+        class Assets:
             """
             This class is used to store the URL of assets
             """
             # @st.cache_resource
             def __init__(self) -> None:
+                self.space_asset = 'https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/space.png?raw=true'
                 self.white_tile_asset = 'https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/white_tile.png?raw=true'
                 self.black_tile_asset = 'https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/black_tile.png?raw=true'
                 self.white_tile_assets = []
@@ -286,17 +230,46 @@ class App:
                     for tile_number in range(0, MAX_TILE_NUMBER + 1):
                         asset_list.append('https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/' + tile_color + '_' + str(tile_number) + '.png?raw=true')
 
-        def show_interact_page(self, player:PlayerTileSet) -> None:
-            st.markdown('## The Da Vinci Code Game')
-
-            tile_buttons = {}
-            tile_row = []
-            st.markdown(f'### Tiles of player {game_host.all_players.index(player)} (you):')
-            for tile in player.get_tile_list():
-                if tile.color.value == Tile.Colors.WHITE.value:
+        def append_tile_row(self, tile, tile_row, default_show_number:bool):
+            if tile.color.value == Tile.Colors.WHITE.value:
+                if default_show_number or tile.direction.value == Tile.Directions.PUBLIC.value:
                     tile_row.append(self.tile_assets.white_tile_assets[tile.number])
                 else:
+                    tile_row.append(self.tile_assets.white_tile_asset)
+            else:
+                if default_show_number or tile.direction.value == Tile.Directions.PUBLIC.value:
                     tile_row.append(self.tile_assets.black_tile_assets[tile.number])
+                else:
+                    tile_row.append(self.tile_assets.black_tile_asset)
+
+        def next_player(self, player):
+            last_players = list(last_player for last_player in game_host.all_players if player.is_lose() == False)
+            if last_players.index(self.app_self.current_player) < len(last_players) - 1:
+                self.app_self.current_player = last_players[last_players.index(self.app_self.current_player) + 1]
+            else:
+                self.app_self.current_player = last_players[0]
+
+        def show_interact_page(self, player:PlayerTileSet) -> None:
+            # Title
+            st.markdown('# The Da Vinci Code Game')
+
+            # Player's information
+            tile_buttons = {}
+            tile_row = []
+            st.markdown(f'## Tiles of player {game_host.all_players.index(player)} (you):')
+            st.markdown('### The final one is the one you just drawn')
+            for tile in player.get_tile_list():
+                self.append_tile_row(tile, tile_row, True)
+
+            if player.temp_tile == None:
+                try:
+                    player.draw_tile(game_host.table_tile_set)
+                except ValueError:
+                    pass
+            if player.temp_tile != None:
+                tile_row.append(self.tile_assets.space_asset)
+                self.append_tile_row(player.temp_tile, tile_row, True)
+
             tile_buttons[player] = (
                 clickable_images(
                     tile_row,
@@ -307,22 +280,19 @@ class App:
                 )
             )
 
+            tile_directions = ''
+            for tile in player.get_tile_list():
+                tile_directions += str('<font color="red"> Public</font>' if tile.direction.value == Tile.Directions.PUBLIC.value else '<font color="green"> Private</font>')
+            st.markdown(f'### Tile status: {tile_directions}', unsafe_allow_html=True) # unsafe_allow_html is unsafe
+
+            # Other players' information and guessing interactions
             other_players = list(game_host.all_players)
             other_players.remove(player)
             for other_player in other_players:
-                st.markdown(f'### Tiles of player {game_host.all_players.index(other_player)}:')
+                st.markdown(f'## Tiles of player {game_host.all_players.index(other_player)}:')
                 tile_row = []
                 for tile in other_player.get_tile_list():
-                    if tile.color.value == Tile.Colors.WHITE.value:
-                        if tile.direction.value == Tile.Directions.PRIVATE.value:
-                            tile_row.append(self.tile_assets.white_tile_asset)
-                        else:
-                            tile_row.append(self.tile_assets.white_tile_assets[tile.number])
-                    else:
-                        if tile.direction.value == Tile.Directions.PRIVATE.value:
-                            tile_row.append(self.tile_assets.black_tile_asset)
-                        else:
-                            tile_row.append(self.tile_assets.black_tile_assets[tile.number])
+                    self.append_tile_row(tile, tile_row, False)
 
                 if 'button_keys' not in st.session_state:
                     st.session_state.button_keys = {i:(i+1)*(10**10) for i in range(NUMBER_OF_PLAYERS)}
@@ -337,31 +307,52 @@ class App:
                     )
                 )
 
-            # st.markdown('## Please enter a number here and click on a tile to guess')
-            guess_number = st.number_input('Please enter a number here and click on a tile to guess', min_value=0, max_value=MAX_TILE_NUMBER, value=0, step=1)
+            st.markdown('### Please enter a number here and click on a tile to guess')
+            guess_number = st.number_input('', min_value=0, max_value=MAX_TILE_NUMBER, value=0, step=1)
 
+            if self.app_self.abled_2_end_turn:
+                end_turn_button = st.button('End turn')
+            else:
+                end_turn_button = False
+
+            # Detect clicks and perform guess
+            if self.app_self.abled_2_end_turn == True and end_turn_button:
+                self.app_self.abled_2_end_turn = False
+                player.end_turn()
+                self.next_player(player)
+                self.app_self.store_session()
+            
             for other_player in other_players:
                 if tile_buttons[other_player] > -1:
                     st.session_state.button_keys[game_host.all_players.index(other_player)] = st.session_state.button_keys[game_host.all_players.index(other_player)] + 1
                     try:
-                        st.write(game_host.all_players.index(other_player), tile_buttons[other_player], guess_number)
                         guess_result = player.make_guess(game_host.all_players, game_host.all_players.index(other_player), tile_buttons[other_player], guess_number)
                         if guess_result == True:
-                            st.markdown('### Right guess')
+                            st.markdown('### <font color="green">Right guess</font>', unsafe_allow_html=True) # unsafe_allow_html is unsafe
+                            if game_host.is_game_over():
+                                self.app_self.game_stage = self.app_self.GameStage.GAME_OVER
+                            self.app_self.abled_2_end_turn = True
                             self.app_self.store_session()
                         else:
-                            if game_host.all_players.index(self.app_self.current_player) < NUMBER_OF_PLAYERS - 1:
-                                self.app_self.current_player = game_host.all_players[game_host.all_players.index(self.app_self.current_player) + 1]
-                            else:
-                                self.app_self.current_player = game_host.all_players[0]
+                            st.markdown('### <font color="yellow">Wrong guess</font>', unsafe_allow_html=True) # unsafe_allow_html is unsafe
+                            self.next_player(player)
                             self.app_self.store_session()
                         st.rerun()
                     except ValueError:
-                        st.markdown('### Invalid guess')
+                        st.markdown('### <font color="red">Invalid guess</font>', unsafe_allow_html=True) # unsafe_allow_html is unsafe
+                        st.rerun()
             self.app_self.store_session()
 
     def show_game_over_page(self) -> None:
-        pass
+        # Title
+        st.markdown('# The Da Vinci Code Game')
+
+        # Winner text
+        last_player_index = game_host.all_players.index(set(player for player in game_host.all_players if player.is_lose() == False).pop())
+        st.markdown(f'## Game over, the winner is player {last_player_index}!')
+        if st.button('Play again'):
+            self.game_stage = self.GameStage.UNINITIALIZED
+            self.store_session()
 
     def store_session(self) -> None:
         st.session_state.game_stage = self.game_stage
@@ -373,6 +364,7 @@ class App:
                 st.session_state.current_player = self.current_player
                 st.session_state.table_tile_set = game_host.table_tile_set
                 st.session_state.all_players = game_host.all_players
+                st.session_state.abled_2_end_turn = self.abled_2_end_turn
                 
             case self.GameStage.GAME_OVER.value:
                 pass
