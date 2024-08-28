@@ -266,11 +266,11 @@ class App:
                     tile_row.append(self.tile_assets.black_tile_asset)
 
         def next_player(self, player):
-            last_players = list(last_player for last_player in game_host.all_players if player.is_lose() == False)
-            if last_players.index(self.app_self.current_player) < len(last_players) - 1:
-                self.app_self.current_player = last_players[last_players.index(self.app_self.current_player) + 1]
-            else:
-                self.app_self.current_player = last_players[0]
+            alive_players = list(alive_player for alive_player in game_host.all_players if player.is_lose() == False)
+
+            current_player_index = alive_players.index(self.app_self.current_player)
+            next_player_index = (current_player_index + 1) % len(alive_players)
+            self.app_self.current_player = alive_players[next_player_index]
 
         def show_interact_page(self, player:PlayerTileSet) -> None:
             # Title
