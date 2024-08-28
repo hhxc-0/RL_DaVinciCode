@@ -13,9 +13,7 @@ class Tile:
         PRIVATE = 0
         PUBLIC = 1
 
-    def __init__(
-        self, color: Colors, number: int, direction=Directions.PRIVATE
-    ) -> None:
+    def __init__(self, color: Colors, number: int, direction=Directions.PRIVATE) -> None:
         self.color = color
         self.number = number
         self.direction = direction
@@ -105,9 +103,7 @@ class PlayerTileSet:
         guessTarget = all_players[target_index]
         if tile_index < 0 or tile_index >= len(guessTarget.get_tile_list()):
             raise ValueError("invalid guess")
-        elif (
-            guessTarget.get_tile_list()[tile_index].direction == Tile.Directions.PUBLIC
-        ):
+        elif guessTarget.get_tile_list()[tile_index].direction == Tile.Directions.PUBLIC:
             raise ValueError("invalid guess")
         elif guessTarget.verify_guess(tile_index, tile_number):
             return True  # right guess
@@ -133,9 +129,7 @@ class PlayerTileSet:
             self.temp_tile = None
 
     def is_lose(self) -> bool:
-        return not any(
-            tile.direction == Tile.Directions.PRIVATE for tile in self.tile_set
-        )
+        return not any(tile.direction == Tile.Directions.PRIVATE for tile in self.tile_set)
 
 
 class GameHost:
@@ -170,9 +164,7 @@ class GameHost:
                 player.draw_tile(self.table_tile_set, direct_draw=True)
 
     def is_game_over(self) -> bool:
-        last_players = list(
-            player for player in self.all_players if player.is_lose() == False
-        )
+        last_players = list(player for player in self.all_players if player.is_lose() == False)
         if len(last_players) <= 1:
             return True
         else:
@@ -262,7 +254,9 @@ class App:
 
             # @st.cache_resource
             def __init__(self) -> None:
-                self.space_asset = "https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/space.png?raw=true"
+                self.space_asset = (
+                    "https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/space.png?raw=true"
+                )
                 self.white_tile_asset = "https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/white_tile.png?raw=true"
                 self.black_tile_asset = "https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/black_tile.png?raw=true"
                 self.white_tile_assets = []
@@ -284,27 +278,19 @@ class App:
 
         def append_tile_row(self, tile, tile_row, default_show_number: bool):
             if tile.color.value == Tile.Colors.WHITE.value:
-                if (
-                    default_show_number
-                    or tile.direction.value == Tile.Directions.PUBLIC.value
-                ):
+                if default_show_number or tile.direction.value == Tile.Directions.PUBLIC.value:
                     tile_row.append(self.tile_assets.white_tile_assets[tile.number])
                 else:
                     tile_row.append(self.tile_assets.white_tile_asset)
             else:
-                if (
-                    default_show_number
-                    or tile.direction.value == Tile.Directions.PUBLIC.value
-                ):
+                if default_show_number or tile.direction.value == Tile.Directions.PUBLIC.value:
                     tile_row.append(self.tile_assets.black_tile_assets[tile.number])
                 else:
                     tile_row.append(self.tile_assets.black_tile_asset)
 
         def next_player(self, player):
             alive_players = list(
-                alive_player
-                for alive_player in game_host.all_players
-                if player.is_lose() == False
+                alive_player for alive_player in game_host.all_players if player.is_lose() == False
             )
 
             current_player_index = alive_players.index(self.app_self.current_player)
@@ -318,9 +304,7 @@ class App:
             # Player's information
             tile_buttons = {}
             tile_row = []
-            st.markdown(
-                f"## Tiles of player {game_host.all_players.index(player)} (you):"
-            )
+            st.markdown(f"## Tiles of player {game_host.all_players.index(player)} (you):")
             st.markdown("### The final one is the one you just drawn")
             for tile in player.get_tile_list():
                 self.append_tile_row(tile, tile_row, True)
@@ -361,9 +345,7 @@ class App:
             other_players = list(game_host.all_players)
             other_players.remove(player)
             for other_player in other_players:
-                st.markdown(
-                    f"## Tiles of player {game_host.all_players.index(other_player)}:"
-                )
+                st.markdown(f"## Tiles of player {game_host.all_players.index(other_player)}:")
                 tile_row = []
                 for tile in other_player.get_tile_list():
                     self.append_tile_row(tile, tile_row, False)
@@ -382,9 +364,7 @@ class App:
                     },
                     img_style={"margin": "5px", "height": "200px"},
                     # key=game_host.all_players.index(other_player)
-                    key=st.session_state.button_keys[
-                        game_host.all_players.index(other_player)
-                    ],
+                    key=st.session_state.button_keys[game_host.all_players.index(other_player)],
                 )
 
             st.markdown("### Please enter a number here and click on a tile to guess")
@@ -406,13 +386,8 @@ class App:
 
             for other_player in other_players:
                 if tile_buttons[other_player] > -1:
-                    st.session_state.button_keys[
-                        game_host.all_players.index(other_player)
-                    ] = (
-                        st.session_state.button_keys[
-                            game_host.all_players.index(other_player)
-                        ]
-                        + 1
+                    st.session_state.button_keys[game_host.all_players.index(other_player)] = (
+                        st.session_state.button_keys[game_host.all_players.index(other_player)] + 1
                     )
                     try:
                         guess_result = player.make_guess(
@@ -427,9 +402,7 @@ class App:
                                 unsafe_allow_html=True,
                             )  # unsafe_allow_html is unsafe
                             if game_host.is_game_over():
-                                self.app_self.game_stage = (
-                                    self.app_self.GameStage.GAME_OVER
-                                )
+                                self.app_self.game_stage = self.app_self.GameStage.GAME_OVER
                             self.app_self.abled_2_end_turn = True
                             self.app_self.store_session()
                         else:
@@ -454,9 +427,7 @@ class App:
 
         # Winner text
         last_player_index = game_host.all_players.index(
-            set(
-                player for player in game_host.all_players if player.is_lose() == False
-            ).pop()
+            set(player for player in game_host.all_players if player.is_lose() == False).pop()
         )
         st.markdown(f"## Game over, the winner is player {last_player_index}!")
         if st.button("Play again"):
