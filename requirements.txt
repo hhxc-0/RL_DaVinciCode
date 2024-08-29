@@ -1,5 +1,6 @@
-numpy
-gymnasium
+black
 pytest
 streamlit
 st_clickable_images
+numpy
+gymnasium
