@@ -158,7 +158,11 @@ class GameHost:
     """
 
     def __init__(
-        self, numPlayer: int, initial_tiles: int, max_tile_number: int, np_random: np.random.Generator = None
+        self,
+        numPlayer: int,
+        initial_tiles: int,
+        max_tile_number: int,
+        np_random: np.random.Generator = None,
     ) -> None:
         assert initial_tiles and initial_tiles > 0, "Invalid initial_tiles"
         self.initial_tiles = initial_tiles
