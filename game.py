@@ -1,5 +1,5 @@
 from enum import Enum
-import random as rd
+import numpy as np
 import streamlit as st
 from st_clickable_images import clickable_images
 
@@ -67,7 +67,8 @@ class PlayerTileSet:
         is_lose: Test if the player loses the game
     """
 
-    def __init__(self) -> None:
+    def __init__(self, np_random: np.random.Generator = None) -> None:
+        self.np_random = np_random if np_random else np.random.default_rng()
         self.tile_set = set()
         self.temp_tile = None
 
@@ -81,7 +82,7 @@ class PlayerTileSet:
         if len(table_tile_set.tile_set) == 0:
             raise ValueError("Empty table error")
         else:
-            tile = rd.choice(list(table_tile_set.tile_set))
+            tile = self.np_random.choice(list(table_tile_set.tile_set))
             if direct_draw:
                 self.tile_set.add(tile)
             else:
@@ -149,10 +150,11 @@ class GameHost:
         start_game: Run the main game routine
     """
 
-    def __init__(self, numPlayer) -> None:
+    def __init__(self, numPlayer: int, np_random: np.random.Generator = None) -> None:
+        self.np_random = np_random if np_random else np.random.default_rng()
         self.table_tile_set = TableTileSet()
         self.all_players = [
-            PlayerTileSet() for count in range(0, numPlayer)
+            PlayerTileSet(self.np_random) for count in range(0, numPlayer)
         ]  # Set number of players here
 
     def init_game(self) -> None:
