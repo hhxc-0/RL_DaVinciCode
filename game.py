@@ -180,6 +180,22 @@ class GameHost:
             for player in self.all_players:
                 player.draw_tile(self.table_tile_set, direct_draw=True)
 
+    def get_next_player_index(self, current_player: int | PlayerTileSet) -> int:
+        if isinstance(current_player, int):
+            current_player_index = current_player
+        else:
+            current_player_index = self.all_players.index(current_player)
+
+        alive_player_indecies = [
+            player_index
+            for player_index, player in enumerate(self.all_players)
+            if not player.is_lose()
+        ]
+        next_player_index = alive_player_indecies[
+            (alive_player_indecies.index(current_player_index) + 1) % len(alive_player_indecies)
+        ]
+        return next_player_index
+
     def is_game_over(self) -> bool:
         last_players = list(player for player in self.all_players if player.is_lose() == False)
         if len(last_players) <= 1:

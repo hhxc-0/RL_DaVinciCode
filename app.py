@@ -122,13 +122,8 @@ class App:
                     tile_row.append(self.tile_assets.black_tile_asset)
 
         def next_player(self, player):
-            alive_players = list(
-                alive_player for alive_player in game_host.all_players if player.is_lose() == False
-            )
-
-            current_player_index = alive_players.index(self.app_self.current_player)
-            next_player_index = (current_player_index + 1) % len(alive_players)
-            self.app_self.current_player = alive_players[next_player_index]
+            next_player_index = game_host.get_next_player_index(player)
+            self.app_self.current_player = game_host.all_players[next_player_index]
 
         def show_interact_page(self, player: PlayerTileSet) -> None:
             # Title
