@@ -45,9 +45,12 @@ class TableTileSet:
 
     def init_tile_set(self) -> None:
         for color in Tile.Colors:
-            for number in range(0, self.max_tile_number + 1):
+            for number in range(1, self.max_tile_number + 1):
                 tile = Tile(color, number)
                 self.tile_set.add(tile)
+
+    def __str__(self) -> str:
+        return f"TableTileSet: ({"".join([str(tile) + ",\n" for tile in self.tile_set])})"
 
 
 class PlayerTileSet:
@@ -102,7 +105,7 @@ class PlayerTileSet:
             or target_index < 0
             or target_index == all_players.index(self)
             or all_players[target_index].is_lose()
-            or tile_number < 0
+            or tile_number < 1
             or tile_number > self.max_tile_number
         ):
             raise ValueError("invalid guess")
