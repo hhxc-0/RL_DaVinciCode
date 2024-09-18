@@ -50,7 +50,8 @@ class TableTileSet:
                 self.tile_set.add(tile)
 
     def __str__(self) -> str:
-        return f"TableTileSet: ({"".join([str(tile) + ",\n" for tile in self.tile_set])})"
+        table_tile_set_str = "".join([str(tile) + ",\n" for tile in self.tile_set])
+        return f"TableTileSet: \n({table_tile_set_str})"
 
 
 class PlayerTileSet:
