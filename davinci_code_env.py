@@ -168,6 +168,7 @@ class DavinciCodeEnv(gym.Env):
 
             return invalid_action
 
+        action = np.copy(action)
         invalid_action = _normalize_action(action)
 
         target_player_index, tile_index, number_on_tile = action
@@ -178,7 +179,7 @@ class DavinciCodeEnv(gym.Env):
         except ValueError:
             invalid_action = True
             guess_result = False
-        
+
         terminated = (
             self.game_host.is_game_over()
         )  # An episode is done when there is only one player have private tiles
@@ -187,9 +188,12 @@ class DavinciCodeEnv(gym.Env):
             self._current_player_index = self.game_host.get_next_player_index(
                 self._current_player_index
             )  # Update the current player index to the next player
-            self.game_host.all_players[self._current_player_index].draw_tile(
-                self.game_host.table_tile_set
-            )
+            try:
+                self.game_host.all_players[self._current_player_index].draw_tile(
+                    self.game_host.table_tile_set
+                )
+            except ValueError:
+                pass
         observation = self._get_obs()
         info = self._get_info()
 
