@@ -91,7 +91,7 @@ class PlayerTileSet:
         if len(table_tile_set.tile_set) == 0:
             raise ValueError("Empty table error")
         else:
-            tile = self.np_random.choice(list(table_tile_set.tile_set))
+            tile = self.np_random.choice(sorted(table_tile_set.tile_set, key=lambda x: x.number * 2 + x.color.value))
             if direct_draw:
                 self.tile_set.add(tile)
             else:
@@ -126,6 +126,8 @@ class PlayerTileSet:
 
     def verify_guess(self, tile_index: int, tile_number: int) -> bool:
         tile = self.get_tile_list()[tile_index]
+        if tile.direction == Tile.Directions.PUBLIC:
+            raise ValueError("invalid guess")
         if tile.number == tile_number:
             tile.direction = Tile.Directions.PUBLIC
             return True
@@ -185,7 +187,7 @@ class GameHost:
                 player.draw_tile(self.table_tile_set, direct_draw=True)
 
     def get_next_player_index(self, current_player: int | PlayerTileSet) -> int:
-        if isinstance(current_player, int):
+        if isinstance(current_player, (int, np.integer)):
             current_player_index = current_player
         else:
             current_player_index = self.all_players.index(current_player)
