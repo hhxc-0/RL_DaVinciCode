@@ -58,12 +58,15 @@ class DavinciCodeEnv(gym.Env):
         TODO: Define the conditions under which an episode terminates, such as reaching a certain score, completing a set number of rounds, or other game-specific criteria.
     """
 
+    metadata = {"render_modes": ["human"]}
+
     def __init__(
         self,
         num_players=3,
         initial_player=0,
         max_tile_num=11,
         initial_tiles=4,
+        render_mode=None,
     ):
         self._num_players = num_players  # The number of players
         self._current_player_index = initial_player  # The index of the current player
@@ -90,12 +93,15 @@ class DavinciCodeEnv(gym.Env):
             [num_players - 1, 2 * max_tile_num, max_tile_num], np.uint8
         )  # MultiDiscrete action space: [target_player_index, tile_index, number_on_tile]
 
+        assert render_mode is None or render_mode in self.metadata["render_modes"]
+        self._render_mode = render_mode
+
     def _get_obs(self):
         player_obs = np.zeros_like(self._observation_space_nvec, np.uint8)
         for player_index in range(self._num_players):
             for tile_index, tile in enumerate(
                 sorted(
-                    list(self.game_host.all_players[player_index].tile_set),
+                    list(self._game_host.all_players[player_index].tile_set),
                     key=lambda x: x.number * 2 + x.color.value,
                 )
             ):
@@ -116,10 +122,10 @@ class DavinciCodeEnv(gym.Env):
 
         return player_obs
 
-    def _get_reward(self, action, invalid_action: bool, guess_result: bool) -> float:
+    def _get_reward(self, target_player_index, invalid_action: bool, guess_result: bool) -> float:
         reward = np.float32(0.0)
 
-        if invalid_action or self.game_host.all_players[action[0]].is_lose():
+        if invalid_action:
             reward = -3.0  # Penalty for invalid action
         elif guess_result:
             reward = 1.0  # Reward for correct guess
@@ -135,21 +141,24 @@ class DavinciCodeEnv(gym.Env):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
-        self.game_host = game.GameHost(  # Set game_host to private variable after debugging
+        self._game_host = game.GameHost(
             self._num_players, self._initial_tiles, self._max_tile_num, super().np_random
         )
-        self.game_host.init_game()
+        self._game_host.init_game()
 
         if new_player_index is None:
             self._current_player_index = super().np_random.integers(self._num_players)
         assert 0 <= self._current_player_index < self._num_players, "Invalid player index"
 
-        self.game_host.all_players[self._current_player_index].draw_tile(
-            self.game_host.table_tile_set
+        self._game_host.all_players[self._current_player_index].draw_tile(
+            self._game_host.table_tile_set
         )
 
         observation = self._get_obs()
         info = self._get_info()
+
+        if self._render_mode == "human":
+            self._render_frame()
 
         return observation, info
 
@@ -159,7 +168,7 @@ class DavinciCodeEnv(gym.Env):
             original_action = np.copy(action)
             action[0] = np.clip(action[0], 0, self._num_players - 1)
             action[1] = np.clip(
-                action[1], 0, len(self.game_host.all_players[action[0]].tile_set) - 1
+                action[1], 0, len(self._game_host.all_players[action[0]].tile_set) - 1
             )
             action[2] = np.clip(action[2], 0, self._max_tile_num - 1)
 
@@ -177,30 +186,51 @@ class DavinciCodeEnv(gym.Env):
 
         target_player_index, tile_index, number_on_tile = action
         try:
-            guess_result = self.game_host.all_players[self._current_player_index].make_guess(
-                self.game_host.all_players, target_player_index, tile_index, number_on_tile
+            guess_result = self._game_host.all_players[self._current_player_index].make_guess(
+                self._game_host.all_players, target_player_index, tile_index, number_on_tile
             )
         except ValueError:
             invalid_action = True
             guess_result = False
 
         terminated = (
-            self.game_host.is_game_over()
+            self._game_host.is_game_over()
         )  # An episode is done when there is only one player have private tiles
-        reward = self._get_reward(action, invalid_action, guess_result)
+        reward = self._get_reward(target_player_index, invalid_action, guess_result)
         if not terminated and guess_result == False:
-            self._current_player_index = self.game_host.get_next_player_index(
+            self._current_player_index = self._game_host.get_next_player_index(
                 self._current_player_index
             )  # Update the current player index to the next player
             try:
-                self.game_host.all_players[self._current_player_index].draw_tile(
-                    self.game_host.table_tile_set
+                self._game_host.all_players[self._current_player_index].draw_tile(
+                    self._game_host.table_tile_set
                 )
             except ValueError:
                 pass
         observation = self._get_obs()
         info = self._get_info()
+
+        if self._render_mode == "human":
+            self._render_frame()
+
         return observation, reward, terminated, False, info
+
+    def render(self):
+        pass
+
+    def _render_frame(self):
+        print("----------------")
+        print(f"Current Player: {self._current_player_index+1}")
+        for player_index in np.roll(np.arange(self._num_players), -self._current_player_index):
+            print(f"\nPlayer {player_index+1}'s tiles:")
+            for tile_index, tile in enumerate(
+                sorted(
+                    list(self._game_host.all_players[player_index].tile_set),
+                    key=lambda x: x.number * 2 + x.color.value,
+                )
+            ):
+                print(f"Tile {tile_index+1}: {tile.direction.name} {tile.color.name} {tile.number}")
+        print("----------------")
 
     def close(self):
         pass
