@@ -131,7 +131,7 @@ class DavinciCodeEnv(gym.Env):
     def _get_info(self):
         return {"current_player_index": self._current_player_index}
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed=None, options=None, new_player_index=None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
@@ -139,6 +139,10 @@ class DavinciCodeEnv(gym.Env):
             self._num_players, self._initial_tiles, self._max_tile_num, super().np_random
         )
         self.game_host.init_game()
+
+        if new_player_index is None:
+            self._current_player_index = super().np_random.integers(self._num_players)
+        assert 0 <= self._current_player_index < self._num_players, "Invalid player index"
 
         self.game_host.all_players[self._current_player_index].draw_tile(
             self.game_host.table_tile_set
@@ -196,7 +200,6 @@ class DavinciCodeEnv(gym.Env):
                 pass
         observation = self._get_obs()
         info = self._get_info()
-
         return observation, reward, terminated, False, info
 
     def close(self):
