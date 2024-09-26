@@ -12,51 +12,45 @@ class DavinciCodeEnv(gym.Env):
     Environment Documentation: Davinci Code Multi-Agent Environment
 
     Description:
-        This environment simulates a multi-agent game of Davinci Code, where multiple players compete to guess the correct tiles based on given clues.
+        This environment simulates a multi-agent game of Davinci Code, where multiple players compete to guess the correct tiles based on provided clues.
 
     Observation Space:
         Type: MultiDiscrete
-        The observation space consists of two components:
+        A 3D tensor representing the state of each player's tiles, with a shape of (num_players, 2 * max_tile_num, 3), where:
+            - num_players: The total number of players in the game.
+            - 2 * max_tile_num: The total number of tiles, doubled to account for each color.
+            - 3: The number of features associated with each tile.
 
-        1. player_obs:
-            A 3D tensor representing the state of each player's tiles, with shape (num_players, 2 * max_tile_num, 3), where:
-                - num_players: The total number of players in the game.
-                - 2 * max_tile_num: The total number of tiles, multiplied by 2 (one set for each color).
-                - 3: The number of features associated with each tile.
-
-            Tile Features:
-                Each tile is described by the following features:
-                    - tile_direction:
-                        - 0: Private tile
-                        - 1: Public tile
-                    - tile_color:
-                        - 0: Unknown color
-                        - 1: Black tile
-                        - 2: White tile
-                    - tile_number:
-                        - 0: Unknown number
-                        - 1 to max_tile_num: The specific number on the tile
-
-        2. current_player_index:
-            An integer indicating the index of the current player whose turn it is to act.
+        Tile Features:
+            Each tile is characterized by the following features:
+                - tile_direction:
+                    - 0: Private tile
+                    - 1: Public tile
+                - tile_color:
+                    - 0: Unknown color
+                    - 1: Black tile
+                    - 2: White tile
+                - tile_number:
+                    - 0: Unknown number
+                    - 1 to max_tile_num: The specific number on the tile
 
     Action Space:
         Type: MultiDiscrete
         The action space consists of three discrete values:
-            - target_player_index: The index of the player being targeted for a guess.
-            - tile_index: The index of the tile that the player is guessing.
-            - number_on_tile: The specific number on the tile that the player is guessing.
+            - target_player_index: The index of the player targeted for a guess.
+            - tile_index: The index of the tile being guessed.
+            - number_on_tile: The specific number on the tile being guessed.
 
-    Reward Structure:
-        TODO: Define the reward function, including positive and negative rewards based on correct or incorrect guesses.
+    Reward:
+        TODO: Determine the reward function.
 
     Starting State:
-        The game board is initialized with two sets of tiles, each containing max_tile_num tiles, one set for each color (black and white).
-        All players begin with initial_tiles, which are randomly drawn from the board at the start of the game.
+        The game board is initialized with two sets of tiles, each containing max_tile_num tiles, one set for each color (black and white). All players start with initial_tiles, which are randomly drawn from the board at the beginning of the game.
 
     Episode Termination:
-        TODO: Define the conditions under which an episode terminates, such as reaching a certain score, completing a set number of rounds, or other game-specific criteria.
+        The episode terminates when all players except one have revealed all their tiles as public, resulting in a winner.
     """
+
 
     metadata = {"render_modes": ["human"]}
 
@@ -122,16 +116,28 @@ class DavinciCodeEnv(gym.Env):
 
         return player_obs
 
-    def _get_reward(self, target_player_index, invalid_action: bool, guess_result: bool) -> float:
+    def _get_reward(
+        self,
+        target_player_index,
+        tile_index,
+        number_on_tile,
+        invalid_action: bool,
+        guess_result: bool,
+    ) -> float:
         reward = np.float32(0.0)
 
         if invalid_action:
-            reward = -3.0  # Penalty for invalid action
-        elif guess_result:
-            reward = 1.0  # Reward for correct guess
+            reward = np.float32(-1.0)  # Penalty for invalid actions
         else:
-            reward = -1.0  # Penalty for incorrect guess
+            true_number_on_tile = (
+                self._game_host.all_players[target_player_index].get_tile_list()[tile_index].number
+            )
+            distance = np.abs(true_number_on_tile - number_on_tile)
+            reward = np.float32(
+                1.0 * (np.float32(distance + 1) ** -2)
+            )  # Countinuous reward for guessing around the correct number
 
+        reward.clip(min=-1.0, max=1.0)
         return reward
 
     def _get_info(self):
@@ -196,7 +202,9 @@ class DavinciCodeEnv(gym.Env):
         terminated = (
             self._game_host.is_game_over()
         )  # An episode is done when there is only one player have private tiles
-        reward = self._get_reward(target_player_index, invalid_action, guess_result)
+        reward = self._get_reward(
+            target_player_index, tile_index, number_on_tile, invalid_action, guess_result
+        )
         if not terminated and guess_result == False:
             self._current_player_index = self._game_host.get_next_player_index(
                 self._current_player_index
