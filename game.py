@@ -49,6 +49,9 @@ class TableTileSet:
                 tile = Tile(color, number)
                 self.tile_set.add(tile)
 
+    def get_tile_list(self) -> list[set]:
+        return sorted(list(self.tile_set), key=lambda x: x.number * 2 + x.color.value)
+
     def __str__(self) -> str:
         table_tile_set_str = "".join([str(tile) + ",\n" for tile in self.tile_set])
         return f"TableTileSet: \n({table_tile_set_str})"
@@ -91,7 +94,7 @@ class PlayerTileSet:
         if len(table_tile_set.tile_set) == 0:
             raise ValueError("Empty table error")
         else:
-            tile = self.np_random.choice(sorted(table_tile_set.tile_set, key=lambda x: x.number * 2 + x.color.value))
+            tile = self.np_random.choice(table_tile_set.get_tile_list())
             if direct_draw:
                 self.tile_set.add(tile)
             else:
