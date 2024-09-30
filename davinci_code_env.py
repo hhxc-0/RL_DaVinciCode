@@ -146,8 +146,12 @@ class DavinciCodeEnv(gym.Env):
 
         return reward + penalty
 
-    def _get_info(self):
-        return {"current_player_index": self._current_player_index}
+    def _get_info(self, correct_guess: bool = False, invalid_action: bool = False) -> dict:
+        return {
+            "current_player_index": self._current_player_index,
+            "correct_guess": correct_guess,
+            "invalid_action": invalid_action,
+        }
 
     def reset(self, seed=None, options=None, new_player_index=None):
         # We need the following line to seed self.np_random
@@ -247,7 +251,7 @@ class DavinciCodeEnv(gym.Env):
             except ValueError:
                 pass
         observation = self._get_obs()
-        info = self._get_info()
+        info = self._get_info(guess_result, invalid_action)
 
         if self._render_mode == "human":
             self._render_frame()

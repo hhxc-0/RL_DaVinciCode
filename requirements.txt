@@ -4,3 +4,5 @@ streamlit
 st_clickable_images
 numpy
 gymnasium
+scipy
+matplotlib
