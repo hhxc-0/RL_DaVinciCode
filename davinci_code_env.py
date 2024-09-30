@@ -244,6 +244,27 @@ class DavinciCodeEnv(gym.Env):
         pass
 
 
+class TupleObservation(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.observation_space = gym.spaces.Tuple(
+            [
+                gym.spaces.MultiDiscrete(
+                    nvec=env.observation_space.nvec[:, :, 0:2], dtype=env.observation_space.dtype
+                ),
+                gym.spaces.Box(
+                    low=0,
+                    high=env.observation_space.nvec[:, :, 2],
+                    dtype=env.observation_space.dtype,
+                ),
+            ]
+        )
+
+    def observation(self, obs):
+        obs = (obs[:, :, 0:2], obs[:, :, 2])
+        return obs
+
+
 register(
     id="DavinciCode-v0",
     entry_point="davinci_code_env:DavinciCodeEnv",
