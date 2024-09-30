@@ -16,23 +16,23 @@ class DavinciCodeEnv(gym.Env):
 
     Observation Space:
         Type: MultiDiscrete
-        A 3D tensor representing the state of each player's tiles, with a shape of (num_players, 2 * max_tile_num, 3), where:
-            - num_players: The total number of players in the game.
-            - 2 * max_tile_num: The total number of tiles, doubled to account for each color.
-            - 3: The number of features associated with each tile.
+    A 3D tensor representing the state of each player's tiles, with a shape of (num_players, 2 * max_tile_num, 3), where:
+        - dim 0: Index of the player
+        - dim 1: Index of the tile
+        - dim 2: Features of the tile, including:
 
-        Tile Features:
-            Each tile is characterized by the following features:
-                - tile_direction:
-                    - 0: Private tile
-                    - 1: Public tile
-                - tile_color:
-                    - 0: Unknown color
-                    - 1: Black tile
-                    - 2: White tile
-                - tile_number:
-                    - 0: Unknown number
-                    - 1 to max_tile_num: The specific number on the tile
+    Tile Features:
+        Each tile is characterized by the following features:
+            - tile_direction:
+                - 0: Private tile
+                - 1: Public tile
+            - tile_color:
+                - 0: Unknown color
+                - 1: Black tile
+                - 2: White tile
+            - tile_number:
+                - 0: Unknown number
+                - 1 to max_tile_num: The specific number on the tile
 
     Action Space:
         Type: MultiDiscrete
@@ -42,7 +42,14 @@ class DavinciCodeEnv(gym.Env):
             - number_on_tile: The specific number on the tile being guessed.
 
     Reward:
-        TODO: Determine the reward function.
+        The reward consists of two components:
+            - invalid_action_penalty: A penalty for invalid actions, which depends on how far the action is from a correct action if it can be corrected, or how severely the action fails if it cannot be corrected.
+            - guess_reward: A reward for guessing the correct number on the tile. This is a continuous reward of 1 when the guess is correct, decreasing as the distance between the guess and the correct number increases.
+
+        The calculation of the resultant reward is as follows:
+            - If the guess is valid, only the guess_reward is considered.
+            - If the guess is invalid but can be corrected, the total reward is the sum of the guess_reward and the invalid_action_penalty.
+            - If the guess is invalid and cannot be corrected, only the invalid_action_penalty is considered.
 
     Starting State:
         The game board is initialized with two sets of tiles, each containing max_tile_num tiles, one set for each color (black and white). All players start with initial_tiles, which are randomly drawn from the board at the beginning of the game.
@@ -124,7 +131,7 @@ class DavinciCodeEnv(gym.Env):
         invalid_action_penalty: float,
         guess_result: bool,
     ) -> float:
-        reward = np.float32(0.0)
+        guess_reward = np.float32(0.0)
         penalty = np.float32(0.0)
 
         if invalid_action:
@@ -138,12 +145,12 @@ class DavinciCodeEnv(gym.Env):
             # return penalty
             return 0
         distance = np.abs(true_number_on_tile - number_on_tile)
-        reward = np.float32(
+        guess_reward = np.float32(
             1 - (np.float32(distance) * 0.2)
         )  # Countinuous reward for guessing around the correct number
-        reward = np.clip(reward, 0.0, 1.0)
+        guess_reward = np.clip(guess_reward, 0.0, 1.0)
 
-        return reward + penalty
+        return guess_reward + penalty
 
     def _get_info(self, correct_guess: bool = False, invalid_action: bool = False) -> dict:
         return {
@@ -227,6 +234,7 @@ class DavinciCodeEnv(gym.Env):
                     raise e
             invalid_action = True
             guess_result = False
+            # print(f"Invalid action: {e.args[0]}, penalty: {invalid_action_penalty}")
 
         terminated = (
             self._game_host.is_game_over()
