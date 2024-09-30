@@ -51,7 +51,6 @@ class DavinciCodeEnv(gym.Env):
         The episode terminates when all players except one have revealed all their tiles as public, resulting in a winner.
     """
 
-
     metadata = {"render_modes": ["human"]}
 
     def __init__(
@@ -90,7 +89,7 @@ class DavinciCodeEnv(gym.Env):
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self._render_mode = render_mode
 
-    def _get_obs(self):
+    def _get_obs(self) -> np.ndarray:
         player_obs = np.zeros_like(self._observation_space_nvec, np.uint8)
         for player_index in range(self._num_players):
             for tile_index, tile in enumerate(
@@ -104,7 +103,7 @@ class DavinciCodeEnv(gym.Env):
                 player_obs[player_index, tile_index, 2] = tile.number
 
         player_obs = np.roll(
-            player_obs, self._current_player_index, axis=0
+            player_obs, self._current_player_index - 1, axis=0
         )  # Shift the current player's observation to the front
 
         mask_condition = player_obs[1 : self._num_players, :, 0] == 1  # Only show public tiles
