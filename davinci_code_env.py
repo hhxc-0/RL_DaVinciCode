@@ -118,27 +118,33 @@ class DavinciCodeEnv(gym.Env):
 
     def _get_reward(
         self,
-        target_player_index,
-        tile_index,
-        number_on_tile,
+        target_player_index: int,
+        tile_index: int,
+        number_on_tile: int,
         invalid_action: bool,
+        invalid_action_penalty: float,
         guess_result: bool,
     ) -> float:
         reward = np.float32(0.0)
+        penalty = np.float32(0.0)
 
         if invalid_action:
-            reward = np.float32(-1.0)  # Penalty for invalid actions
-        else:
+            penalty = np.float32(invalid_action_penalty)  # Penalty for invalid actions
+
+        try:
             true_number_on_tile = (
                 self._game_host.all_players[target_player_index].get_tile_list()[tile_index].number
             )
-            distance = np.abs(true_number_on_tile - number_on_tile)
-            reward = np.float32(
-                1.0 * (np.float32(distance + 1) ** -2)
-            )  # Countinuous reward for guessing around the correct number
+        except IndexError:
+            # return penalty
+            return 0
+        distance = np.abs(true_number_on_tile - number_on_tile)
+        reward = np.float32(
+            1 - (np.float32(distance) * 0.2)
+        )  # Countinuous reward for guessing around the correct number
+        reward = np.clip(reward, 0.0, 1.0)
 
-        reward.clip(min=-1.0, max=1.0)
-        return reward
+        return reward + penalty
 
     def _get_info(self):
         return {"current_player_index": self._current_player_index}
@@ -179,23 +185,43 @@ class DavinciCodeEnv(gym.Env):
             action[2] = np.clip(action[2], 0, self._max_tile_num - 1)
 
             invalid_action = not np.array_equal(action, original_action)
+            invalid_action_penalty = 0.0
+            if invalid_action:
+                invalid_action_penalty = np.clip(
+                    -(np.abs(action - original_action).sum() * 0.05), -1.0, 0.0
+                )
+                # print(f"Invalid action: {original_action} -> {action}, penalty: {invalid_action_penalty}")
 
             # Offset the relative palyer index to the absolute index
             action[0] = (action[0] + self._current_player_index + 1) % self._num_players
             # Offset the tile index to the true number on the tile
             action[2] += 1
 
-            return invalid_action
+            return invalid_action, invalid_action_penalty
 
         action = np.copy(action)
-        invalid_action = _normalize_action(action)
+        invalid_action, invalid_action_penalty = _normalize_action(action)
 
         target_player_index, tile_index, number_on_tile = action
+        guess_result = False
         try:
             guess_result = self._game_host.all_players[self._current_player_index].make_guess(
                 self._game_host.all_players, target_player_index, tile_index, number_on_tile
             )
-        except ValueError:
+        except ValueError as e:
+            match e.args[0]:
+                case game.PlayerTileSet.InvalidActionErrorEnum.TARGET_INDEX_OUT_OF_RANGE:
+                    invalid_action_penalty = -1.0
+                case game.PlayerTileSet.InvalidActionErrorEnum.TARGET_INDEX_INVALID:
+                    invalid_action_penalty = -0.7
+                case game.PlayerTileSet.InvalidActionErrorEnum.TILE_INDEX_OUT_OF_RANGE:
+                    invalid_action_penalty = -1.0
+                case game.PlayerTileSet.InvalidActionErrorEnum.TILE_NUMBER_OUT_OF_RANGE:
+                    invalid_action_penalty = -1.0
+                case game.PlayerTileSet.InvalidActionErrorEnum.TILE_ALREADY_PUBLIC:
+                    invalid_action_penalty = -0.2
+                case _:
+                    raise e
             invalid_action = True
             guess_result = False
 
@@ -203,7 +229,12 @@ class DavinciCodeEnv(gym.Env):
             self._game_host.is_game_over()
         )  # An episode is done when there is only one player have private tiles
         reward = self._get_reward(
-            target_player_index, tile_index, number_on_tile, invalid_action, guess_result
+            target_player_index,
+            tile_index,
+            number_on_tile,
+            invalid_action,
+            invalid_action_penalty,
+            guess_result,
         )
         if not terminated and guess_result == False:
             self._current_player_index = self._game_host.get_next_player_index(

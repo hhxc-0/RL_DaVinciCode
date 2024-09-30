@@ -77,6 +77,13 @@ class PlayerTileSet:
         is_lose: Test if the player loses the game
     """
 
+    class InvalidActionErrorEnum(Enum):
+        TARGET_INDEX_OUT_OF_RANGE = 0
+        TARGET_INDEX_INVALID = 1
+        TILE_INDEX_OUT_OF_RANGE = 2
+        TILE_NUMBER_OUT_OF_RANGE = 3
+        TILE_ALREADY_PUBLIC = 4
+
     def __init__(self, max_tile_number: int, np_random: np.random.Generator = None) -> None:
         assert max_tile_number and max_tile_number > 0, "Invalid max_tile_number"
         self.max_tile_number = max_tile_number
@@ -104,20 +111,17 @@ class PlayerTileSet:
     def make_guess(
         self, all_players: list, target_index: int, tile_index: int, tile_number: int
     ) -> bool:
-        if (
-            target_index >= len(all_players)
-            or target_index < 0
-            or target_index == all_players.index(self)
-            or all_players[target_index].is_lose()
-            or tile_number < 1
-            or tile_number > self.max_tile_number
-        ):
-            raise ValueError("invalid guess")
+        if target_index >= len(all_players) or target_index < 0:
+            raise ValueError(self.InvalidActionErrorEnum.TARGET_INDEX_OUT_OF_RANGE)
+        if target_index == all_players.index(self) or all_players[target_index].is_lose():
+            raise ValueError(self.InvalidActionErrorEnum.TARGET_INDEX_INVALID)
+        if tile_number < 1 or tile_number > self.max_tile_number:
+            raise ValueError(self.InvalidActionErrorEnum.TILE_NUMBER_OUT_OF_RANGE)
         guessTarget = all_players[target_index]
         if tile_index < 0 or tile_index >= len(guessTarget.get_tile_list()):
-            raise ValueError("invalid guess")
+            raise ValueError(self.InvalidActionErrorEnum.TILE_INDEX_OUT_OF_RANGE)
         elif guessTarget.get_tile_list()[tile_index].direction == Tile.Directions.PUBLIC:
-            raise ValueError("invalid guess")
+            raise ValueError(self.InvalidActionErrorEnum.TILE_ALREADY_PUBLIC)
         elif guessTarget.verify_guess(tile_index, tile_number):
             return True  # right guess
         else:
@@ -130,7 +134,7 @@ class PlayerTileSet:
     def verify_guess(self, tile_index: int, tile_number: int) -> bool:
         tile = self.get_tile_list()[tile_index]
         if tile.direction == Tile.Directions.PUBLIC:
-            raise ValueError("invalid guess")
+            raise ValueError(self.InvalidActionErrorEnum.TILE_ALREADY_PUBLIC)
         if tile.number == tile_number:
             tile.direction = Tile.Directions.PUBLIC
             return True
