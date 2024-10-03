@@ -197,7 +197,12 @@ class App:
 
             st.markdown("### Please enter a number here and click on a tile to guess")
             guess_number = st.number_input(
-                "", min_value=0, max_value=MAX_TILE_NUMBER, value=0, step=1
+                "guess number",
+                min_value=0,
+                max_value=MAX_TILE_NUMBER,
+                value=0,
+                step=1,
+                label_visibility="hidden",
             )
 
             if self.app_self.abled_2_end_turn:
