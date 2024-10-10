@@ -1,4 +1,6 @@
 from enum import Enum
+import os
+import base64
 import streamlit as st
 from st_clickable_images import clickable_images
 from game import Tile, PlayerTileSet, GameHost
@@ -87,11 +89,15 @@ class App:
 
             # @st.cache_resource
             def __init__(self) -> None:
-                self.space_asset = (
-                    "https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/space.png?raw=true"
-                )
-                self.white_tile_asset = "https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/white_tile.png?raw=true"
-                self.black_tile_asset = "https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/black_tile.png?raw=true"
+                def rel_path_img_to_base64(rel_path):
+                    abs_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), rel_path)
+                    with open(abs_path, "rb") as image:
+                        encoded = base64.b64encode(image.read()).decode()
+                        return f"data:image/jpeg;base64,{encoded}"
+
+                self.space_asset = rel_path_img_to_base64("assets/space.png")
+                self.white_tile_asset = rel_path_img_to_base64("assets/white_tile.png")
+                self.black_tile_asset = rel_path_img_to_base64("assets/black_tile.png")
                 self.white_tile_assets = []
                 self.black_tile_assets = []
                 for tile_color in ("white_tile", "black_tile"):
@@ -102,11 +108,9 @@ class App:
 
                     for tile_number in range(0, MAX_TILE_NUMBER + 1):
                         asset_list.append(
-                            "https://github.com/hhxc-0/RL-DaVinciCode/blob/main/assets/"
-                            + tile_color
-                            + "_"
-                            + str(tile_number)
-                            + ".png?raw=true"
+                            rel_path_img_to_base64(
+                                "assets/" + tile_color + "_" + str(tile_number) + ".png"
+                            )
                         )
 
         def append_tile_row(self, tile, tile_row, default_show_number: bool):
