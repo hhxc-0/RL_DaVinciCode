@@ -15,6 +15,7 @@ class Tile:
         self.color = color
         self.number = number
         self.direction = direction
+        self.history_guesses = []  # List to store historical guesses
 
     def __str__(self) -> str:
         return f"Color: {self.color.name}, Number: {self.number}, Direction: {self.direction.name}"
@@ -24,6 +25,9 @@ class Tile:
             return f"Color: {self.color.name}"
         else:
             return f"Color: {self.color.name}, Number: {self.number}"
+
+    def add_guess(self, guess: int) -> None:
+        self.history_guesses.append(guess)
 
 
 class TableTileSet:
@@ -94,7 +98,7 @@ class PlayerTileSet:
     def init_tile_set(self) -> None:
         self.tile_set.clear()
 
-    def get_tile_list(self) -> list[set]:
+    def get_tile_list(self) -> list[Tile]:
         return sorted(list(self.tile_set), key=lambda x: x.number * 2 + x.color.value)
 
     def draw_tile(self, table_tile_set, direct_draw=False) -> None:
@@ -139,6 +143,7 @@ class PlayerTileSet:
             tile.direction = Tile.Directions.PUBLIC
             return True
         else:
+            tile.add_guess(tile_number)  # Add the guess to the history
             return False
 
     def end_turn(self) -> None:
