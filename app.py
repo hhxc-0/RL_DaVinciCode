@@ -46,6 +46,7 @@ class App:
                 game_host.table_tile_set = st.session_state.table_tile_set
                 game_host.all_players = st.session_state.all_players
                 self.abled_2_end_turn = st.session_state.abled_2_end_turn
+                self.input_number_missing = st.session_state.input_number_missing
                 self.interact_page = self.InteractPage(self)
                 self.interact_page.show_interact_page(self.current_player)
 
@@ -61,6 +62,7 @@ class App:
         self.game_stage = self.GameStage.INTERACTING
         self.current_player = game_host.all_players[0]
         self.abled_2_end_turn = False
+        self.input_number_missing = False
         self.store_session()
         st.rerun()
 
@@ -133,6 +135,12 @@ class App:
             # Title
             st.markdown("# The Da Vinci Code Game")
 
+            # Links
+            st.markdown(
+                "#### [Github](https://github.com/hhxc-0/RL_DaVinciCode) | [Game rules](https://github.com/hhxc-0/RL_DaVinciCode/blob/main/README.md#Game-Rules)",
+                unsafe_allow_html=True,
+            )
+
             # Player's information
             tile_buttons = {}
             tile_row = []
@@ -200,21 +208,41 @@ class App:
                 )
 
             st.markdown("### Please enter a number here and click on a tile to guess")
+
+            if self.app_self.input_number_missing:
+                st.markdown(
+                    '<h3><font color="red">Please enter a number</font></h3>',
+                    unsafe_allow_html=True,
+                )
+                self.app_self.input_number_missing = False
+
             guess_number = st.number_input(
                 "guess number",
-                min_value=0,
+                min_value=1,
                 max_value=MAX_TILE_NUMBER,
-                value=0,
+                value=None,
                 step=1,
                 label_visibility="hidden",
             )
 
             if self.app_self.abled_2_end_turn:
-                end_turn_button = st.button("End turn")
+                st.markdown(
+                    '<h3><font color="green">Correct guess</font></h3>', unsafe_allow_html=True
+                )
+                st.markdown("You can guess again or end your turn")
+                end_turn_button = st.button("End turn", type="primary")
             else:
                 end_turn_button = st.button("End turn", disabled=True)
 
+            reset_button = st.button("Reset game", type="primary")
+
             # Detect clicks and perform guess
+            if reset_button:
+                self.app_self.game_stage = self.app_self.GameStage.UNINITIALIZED
+                game_host
+                self.app_self.store_session()
+                st.rerun()
+
             if self.app_self.abled_2_end_turn == True and end_turn_button:
                 self.app_self.abled_2_end_turn = False
                 player.end_turn()
@@ -227,6 +255,10 @@ class App:
                     st.session_state.button_keys[game_host.all_players.index(other_player)] = (
                         st.session_state.button_keys[game_host.all_players.index(other_player)] + 1
                     )
+                    if guess_number is None:
+                        self.app_self.input_number_missing = True
+                        self.app_self.store_session()
+                        st.rerun()
                     try:
                         guess_result = player.make_guess(
                             game_host.all_players,
@@ -235,10 +267,6 @@ class App:
                             guess_number,
                         )
                         if guess_result == True:
-                            st.markdown(
-                                '### <font color="green">Right guess</font>',
-                                unsafe_allow_html=True,
-                            )  # unsafe_allow_html is unsafe
                             if game_host.is_game_over():
                                 self.app_self.game_stage = self.app_self.GameStage.GAME_OVER
                             self.app_self.abled_2_end_turn = True
@@ -283,13 +311,14 @@ class App:
                 st.session_state.table_tile_set = game_host.table_tile_set
                 st.session_state.all_players = game_host.all_players
                 st.session_state.abled_2_end_turn = self.abled_2_end_turn
+                st.session_state.input_number_missing = self.input_number_missing
 
             case self.GameStage.GAME_OVER.value:
                 pass
 
 
 NUMBER_OF_PLAYERS = 3
-MAX_TILE_NUMBER = 11
+MAX_TILE_NUMBER = 12
 INITIAL_TILES = 4
 
 if __name__ == "__main__":
