@@ -277,6 +277,7 @@ class App:
                                 unsafe_allow_html=True,
                             )  # unsafe_allow_html is unsafe
                             self.next_player(player)
+                            self.app_self.abled_2_end_turn = False
                             self.app_self.store_session()
                         st.rerun()
                     except ValueError:
