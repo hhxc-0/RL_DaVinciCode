@@ -1,6 +1,6 @@
 black
 pytest
-streamlit
+streamlit==1.38.0
 st_clickable_images
 numpy
 gymnasium
