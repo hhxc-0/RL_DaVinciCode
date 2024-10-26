@@ -137,7 +137,7 @@ class App:
 
             # Links
             st.markdown(
-                "#### [Github](https://github.com/hhxc-0/RL_DaVinciCode) | [Game rules](https://github.com/hhxc-0/RL_DaVinciCode/blob/main/README.md#Game-Rules)",
+                "#### [Github](https://github.com/hhxc-0/RL_DaVinciCode) | [Game rules](https://github.com/hhxc-0/RL_DaVinciCode?tab=readme-ov-file#da-vinci-code-game-rules)",
                 unsafe_allow_html=True,
             )
 
