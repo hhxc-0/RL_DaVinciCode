@@ -147,9 +147,11 @@ class App:
                 unsafe_allow_html=True,
             )
 
+            game_host = self.app_self.env.unwrapped.game_host
+
             # Player's information
             current_player_index = HUMAN_PLAYER_INDEX
-            current_player_tile_set = self.app_self.env.game_host.all_players[current_player_index]
+            current_player_tile_set = game_host.all_players[current_player_index]
             tile_buttons = {}
             tile_row = []
             st.markdown(f"## Tiles of player {current_player_index} (you):")
@@ -185,11 +187,11 @@ class App:
             )  # unsafe_allow_html is unsafe
 
             # Other players' information and guessing interactions
-            other_players = list(self.app_self.env.game_host.all_players)
+            other_players = list(game_host.all_players)
             other_players.remove(current_player_tile_set)
             for other_player in other_players:
                 st.markdown(
-                    f"## Tiles of player {self.app_self.env.game_host.all_players.index(other_player)} (model):"
+                    f"## Tiles of player {game_host.all_players.index(other_player)} (model):"
                 )
                 tile_row = []
                 for tile in other_player.get_tile_list():
@@ -208,10 +210,8 @@ class App:
                         "flex-wrap": "wrap",
                     },
                     img_style={"margin": "5px", "height": "200px"},
-                    # key=self.app_self.env.game_host.all_players.index(other_player)
-                    key=st.session_state.button_keys[
-                        self.app_self.env.game_host.all_players.index(other_player)
-                    ],
+                    # key=game_host.all_players.index(other_player)
+                    key=st.session_state.button_keys[game_host.all_players.index(other_player)],
                 )
 
             st.markdown("### Please enter a number here and click on a tile to guess")
@@ -242,13 +242,8 @@ class App:
 
             for other_player in other_players:
                 if tile_buttons[other_player] > -1:
-                    st.session_state.button_keys[
-                        self.app_self.env.game_host.all_players.index(other_player)
-                    ] = (
-                        st.session_state.button_keys[
-                            self.app_self.env.game_host.all_players.index(other_player)
-                        ]
-                        + 1
+                    st.session_state.button_keys[game_host.all_players.index(other_player)] = (
+                        st.session_state.button_keys[game_host.all_players.index(other_player)] + 1
                     )
                     if guess_number is None:
                         self.app_self.input_number_missing = True
@@ -270,7 +265,7 @@ class App:
                         st.rerun()
                     human_correct_guess = info["correct_guess"]
 
-                    while self.app_self.env.current_player_index != HUMAN_PLAYER_INDEX:
+                    while self.app_self.env.unwrapped.current_player_index != HUMAN_PLAYER_INDEX:
                         dist = model.forward(torch.FloatTensor(obs).to(device))[0]
                         action = [dist_single.sample() for dist_single in dist]
                         obs, _, terminated, truncated, info = self.app_self.env.step(
@@ -286,7 +281,7 @@ class App:
                         if terminated or truncated:
                             break
                     if human_correct_guess == True:
-                        if self.app_self.env.game_host.is_game_over():
+                        if game_host.is_game_over():
                             self.app_self.game_stage = self.app_self.GameStage.GAME_OVER
                         self.app_self.store_session()
                     else:
@@ -310,9 +305,11 @@ class App:
         )
 
         # Winner text
-        last_player_index = self.env.game_host.all_players.index(
+        last_player_index = self.env.unwrapped.game_host.all_players.index(
             set(
-                player for player in self.env.game_host.all_players if player.is_lose() == False
+                player
+                for player in self.env.unwrapped.game_host.all_players
+                if player.is_lose() == False
             ).pop()
         )
         if last_player_index == HUMAN_PLAYER_INDEX:
@@ -345,8 +342,12 @@ USE_MODEL = True
 MODEL_PATH = "./ppo_model_saves/" + "ppo_model_final.pth"
 
 if __name__ == "__main__":
-    model = torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), MODEL_PATH))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = torch.load(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), MODEL_PATH),
+        map_location=device,
+        weights_only=False,
+    )
     model.to(device)
     app = App()
     app.restore_session()
