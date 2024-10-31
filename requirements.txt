@@ -3,6 +3,7 @@ pytest
 streamlit==1.38.0
 st_clickable_images
 numpy
+torch
 gymnasium
 scipy
 matplotlib
