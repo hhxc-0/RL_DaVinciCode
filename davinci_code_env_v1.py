@@ -1,4 +1,5 @@
 import numpy as np
+from copy import deepcopy
 import gymnasium as gym
 from gymnasium import spaces
 from gymnasium.envs.registration import register
@@ -74,61 +75,48 @@ class DavinciCodeEnv(gym.Env):
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self._render_mode = render_mode
 
+        self._last_action_mask = None
+
     def _get_obs(self) -> dict:
         player_obs = np.zeros((2 * self._max_tile_num, 4), dtype=np.uint8)
         tile_count = 0
 
-        # Record the black tiles in the deck
-        for tile in self._game_host.table_tile_set.tile_set:
-            if tile.color == game.Tile.Colors.BLACK:
-                player_obs[tile_count, 0] = tile.color.value  # Color: 0 for black, 1 for white
-                player_obs[tile_count, 1] = 0  # Number: 0 for unknown
-                player_obs[tile_count, 2] = 0  # Player ID: 0 for public deck
-                player_obs[tile_count, 3] = 0  # Order in hand: 0 for deck
-                tile_count += 1
-
-        # Record the white tiles in the deck
-        for tile in self._game_host.table_tile_set.tile_set:
-            if tile.color == game.Tile.Colors.WHITE:
-                player_obs[tile_count, 0] = tile.color.value  # Color: 0 for black, 1 for white
-                tile_count += 1
-
         # Record the tiles in each player's hand
-        for player_index in range(self._num_players):
+        for player_pos, player_index in enumerate(np.roll(np.arange(self._num_players), -self._current_player_index)):
+            tile_set = deepcopy(self.game_host.all_players[player_index].tile_set)
+            if player_index == self._current_player_index and self.game_host.all_players[player_index].temp_tile is not None:
+                # Record the tile in the current player's hand
+                tile_set.add(self.game_host.all_players[player_index].temp_tile)
+            
             for tile_index, tile in enumerate(
                 sorted(
-                    list(self._game_host.all_players[player_index].tile_set),
+                    list(tile_set),
                     key=lambda x: x.number * 2 + x.color.value,
                 )
             ):
-                player_obs[tile_count, 0] = tile.color.value  # Color: 0 for black, 1 for white
+                player_obs[tile_count, 0] = tile.color.value + 1  # Color: 1 for black, 2 for white
                 player_obs[tile_count, 1] = (
                     tile.number
                     if player_index == self._current_player_index
                     or tile.direction == game.Tile.Directions.PUBLIC
                     else 0
                 )  # Number: 1 to max_tile_num or 0 for unknown
-                player_obs[tile_count, 2] = (
-                    player_index - self._current_player_index
-                ) % self._num_players + 1  # Player ID: 1 for current player, 2 to n for other players
+                player_obs[tile_count, 2] = player_pos + 1  # Player ID: 1 for current player, 2 to n for other players
                 player_obs[tile_count, 3] = tile_index + 1  # Order in hand: 1 to n
                 tile_count += 1
 
-            # Record the temp_tile if it exists
-            if self._game_host.all_players[player_index].temp_tile is not None:
-                temp_tile = self._game_host.all_players[player_index].temp_tile
-                player_obs[tile_count, 0] = temp_tile.color.value  # Color: 0 for black, 1 for white
-                player_obs[tile_count, 1] = (
-                    temp_tile.number if player_index == self._current_player_index else 0
-                )  # Number: 1 to max_tile_num or 0 for unknown
-                player_obs[tile_count, 2] = (
-                    player_index - self._current_player_index
-                ) % self._num_players + 1  # Player ID: 1 for current player, 2 to n for other players
-                player_obs[tile_count, 3] = 0  # Order in hand: 0 for temp_tile
-                tile_count += 1
+        # Record the tiles in the deck
+        for tile in self.game_host.table_tile_set.tile_set:
+            # player_obs[tile_count, 0] = tile.color.value + 1  # Color: 1 for black, 2 for white
+            player_obs[tile_count, 0] = 0  # Color: 0 for deck
+            player_obs[tile_count, 1] = 0  # Number: 0 for unknown
+            player_obs[tile_count, 2] = 0  # Player ID: 0 for deck
+            player_obs[tile_count, 3] = 0  # Order in hand: 0 for deck
+            tile_count += 1
 
         # Generate the action mask
         action_mask = self._generate_action_mask()
+        self._last_action_mask = action_mask
 
         return {"observation": player_obs, "action_mask": action_mask}
 
@@ -147,7 +135,7 @@ class DavinciCodeEnv(gym.Env):
             original_index = get_original_index(
                 target_player_index + 2, self._current_player_index, self._num_players
             )
-            target_player = self._game_host.all_players[original_index]
+            target_player = self.game_host.all_players[original_index]
             for tile_index in range(2 * self._max_tile_num):
                 if tile_index < len(target_player.get_tile_list()):
                     tile = target_player.get_tile_list()[tile_index]
@@ -160,7 +148,7 @@ class DavinciCodeEnv(gym.Env):
             original_index = get_original_index(
                 target_player_index + 2, self._current_player_index, self._num_players
             )
-            target_player = self._game_host.all_players[original_index]
+            target_player = self.game_host.all_players[original_index]
             if target_player.is_lose():
                 return False
             if tile_number < 1 or tile_number > self._max_tile_num:
@@ -173,26 +161,28 @@ class DavinciCodeEnv(gym.Env):
         except (IndexError, ValueError):
             return False
 
-    def _get_info(self, correct_guess: bool = False) -> dict:
+    def _get_info(self, correct_guess: bool = False, invalid_action: bool = False) -> dict:
         return {
             "current_player_index": self._current_player_index,
             "correct_guess": correct_guess,
+            "invalid_action": invalid_action,
         }
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
-        self._game_host = game.GameHost(
+        self.game_host = game.GameHost(
             self._num_players, self._initial_tiles, self._max_tile_num, super().np_random
         )
-        self._game_host.init_game()
+        self.game_host.init_game()
         self._current_player_index = 0
 
         assert 0 <= self._current_player_index < self._num_players, "Invalid player index"
 
-        self._game_host.all_players[self._current_player_index].draw_tile(
-            self._game_host.table_tile_set
+        self.game_host.all_players[self._current_player_index].draw_tile(
+            self.game_host.table_tile_set,
+            direct_draw=True,
         )
 
         observation = self._get_obs()
@@ -206,57 +196,66 @@ class DavinciCodeEnv(gym.Env):
     def step(self, action):
         target_player_index, tile_index, number_on_tile = action
         guess_result = False
+        invalid_action = False
 
         original_index = get_original_index(
             target_player_index + 2, self._current_player_index, self._num_players
         )
-        # print(target_player_index, original_index)
 
         try:
-            guess_result = self._game_host.all_players[self._current_player_index].make_guess(
-                self._game_host.all_players, original_index, tile_index, number_on_tile + 1
+            guess_result = self.game_host.all_players[self._current_player_index].make_guess(
+                self.game_host.all_players, original_index, tile_index, number_on_tile + 1
             )
         except ValueError as e:
-            print("error", e.args[0])
+            # print("error", e.args[0])
+            pass
 
-        # print(guess_result)
-        terminated = self._game_host.is_game_over()
+        terminated = self.game_host.is_game_over()
+        truncated = False
+        if self._last_action_mask is not None and self._last_action_mask[target_player_index, tile_index, number_on_tile] == 0:
+            invalid_action = True
+            truncated = True
 
         # Calculate reward
         if terminated:
-            if self._current_player_index == self._game_host.get_next_player_index(
-                self._current_player_index
-            ):
-                reward = 200  # Large reward for winning the game
+            if not self.game_host.all_players[self._current_player_index].is_lose():
+                reward = 50  # Large reward for winning the game
             else:
-                reward = -200  # Large penalty for losing the game
+                reward = -50  # Large penalty for losing the game
+        elif invalid_action:
+            reward = -15  # Penalty for not following the action mask
         else:
-            if guess_result:
-                reward = 10  # Reward for guessing correctly
-            else:
-                reward = -1  # Penalty for guessing incorrectly
-
-        # Check if the current player has lost
-        if self._game_host.all_players[self._current_player_index].is_lose():
-            reward = -100  # Large penalty for losing the game
+            # if guess_result:
+            #     reward = 10  # Reward for guessing correctly
+            # else:
+            #     reward = -1  # Penalty for guessing incorrectly
+            true_number_on_tile = (
+                self.game_host.all_players[target_player_index].get_tile_list()[tile_index].number
+            )
+            distance = np.abs(true_number_on_tile - number_on_tile)
+            reward = np.float32(
+                5 - (np.float32(distance) * 1.0)
+            )  # Countinuous reward for guessing around the correct number
+            reward = np.clip(reward, -5.0, 5.0)
 
         if not terminated and guess_result == False:
-            self._current_player_index = self._game_host.get_next_player_index(
+            self._current_player_index = self.game_host.get_next_player_index(
                 self._current_player_index
             )  # Update the current player index to the next player
             try:
-                self._game_host.all_players[self._current_player_index].draw_tile(
-                    self._game_host.table_tile_set
+                self.game_host.all_players[self._current_player_index].draw_tile(
+                    self.game_host.table_tile_set
                 )
             except ValueError:
                 pass
+            
         observation = self._get_obs()
-        info = self._get_info(guess_result)
+        info = self._get_info(guess_result, invalid_action)
 
         if self._render_mode == "human":
             self._render_frame()
 
-        return observation, reward, terminated, False, info
+        return observation, reward, terminated, truncated, info
 
     def render(self):
         pass
@@ -268,7 +267,7 @@ class DavinciCodeEnv(gym.Env):
             print(f"\nPlayer {player_index+1}'s tiles:")
             for tile_index, tile in enumerate(
                 sorted(
-                    list(self._game_host.all_players[player_index].tile_set),
+                    list(self.game_host.all_players[player_index].tile_set),
                     key=lambda x: x.number * 2 + x.color.value,
                 )
             ):
