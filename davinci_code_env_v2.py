@@ -23,7 +23,21 @@ class DavinciCodeEnv(gym.Env):
         self._max_tile_num = max_tile_num  # The maximum number on the tiles
         self._initial_tiles = initial_tiles  # The number of tiles each player starts with
 
-        # TODO: define observation space and action space
+        self._tile_obs_len = (
+            1  # exists
+            + 2  # light/dark one hot
+            + (1 + self._max_tile_num)  # unknown or the number on the tile one hot
+        )
+        self._action_space_len = (
+            (self._num_players - 1) * (2 * self._max_tile_num) * self._max_tile_num
+        )
+
+        self.observation_space = spaces.MultiBinary(
+            n=self._num_players * (2 * self._max_tile_num) * self._tile_obs_len  # main obs
+            + self._tile_obs_len  # temp tile obs
+            + self._action_space_len  # action mask
+        )
+        self.action_space = spaces.Discrete(self._action_space_len)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self._render_mode = render_mode
@@ -33,13 +47,7 @@ class DavinciCodeEnv(gym.Env):
     def _get_obs(self) -> dict:
         # Part1: main observation of tiles of each player
         def get_tile_obs(tile: game.Tile, force_visible: bool) -> np.ndarray:
-            tile_obs = np.zeros(
-                (
-                    1  # exists
-                    + 2  # light/dark one hot
-                    + (1 + self._max_tile_num),  # unknown or the number on the tile one hot
-                )
-            )
+            tile_obs = np.zeros((self._tile_obs_len))
             if tile is not None:
                 tile_obs[0] = 1  # tile exists
                 if tile.color == game.Tile.Colors.BLACK:
@@ -54,10 +62,6 @@ class DavinciCodeEnv(gym.Env):
                 else:
                     tile_obs[3] = 1  # tile is not visible
             return tile_obs
-
-        def get_action_mask():
-            # TODO: implement
-            raise NotImplementedError
 
         main_obs_list = []
         for player_index, player in enumerate(self.game_host.all_players):
@@ -76,6 +80,8 @@ class DavinciCodeEnv(gym.Env):
             )
             main_obs_list.append(player_obs)
         main_obs = np.array(main_obs_list)
+        # roll the current player to the front
+        main_obs = np.roll(main_obs, shift=-self._current_player_index, axis=0)
 
         # Part2: tile just drawn
         temp_tile_obs = get_tile_obs(
@@ -83,11 +89,25 @@ class DavinciCodeEnv(gym.Env):
         )
 
         # Part3: action mask
-        # TODO: implement
-        action_mask = get_action_mask()
+        # might not be needed, since whether an action is valid is deducible from the observation.
+        # action_mask = np.zeros(
+        #     (
+        #         self._num_players - 1,
+        #         2 * self._max_tile_num,
+        #         self._max_tile_num,
+        #     )
+        # )
+        # non_self_players = self.game_host.all_players.copy()
+        # non_self_players.pop(self._current_player_index)
+        # for player_index, player in enumerate(non_self_players):
+        #     if player_index == self._current_player_index:
+        #         continue
+        #     player_tile_list = player.get_tile_list()
+        #     for tile_index, tile in enumerate(player_tile_list):
+        #         if tile.direction == game.Tile.Directions.PRIVATE:
+        #             action_mask[player_index][tile_index][:] = 1
 
-        obs = np.concatenate([main_obs.flatten(), temp_tile_obs, action_mask])
-        return obs
+        return np.concatenate([main_obs.flatten(), temp_tile_obs])
 
     def _get_info(self, correct_guess: bool = False, invalid_action: bool = False) -> dict:
         return {
@@ -96,7 +116,7 @@ class DavinciCodeEnv(gym.Env):
             "invalid_action": invalid_action,
         }
 
-    def _get_reward(self):
+    def _get_reward(self, guess_result: bool, invalid_action: bool):
         # TODO: Calculate reward
         raise NotImplementedError
 
@@ -125,33 +145,49 @@ class DavinciCodeEnv(gym.Env):
 
         return observation, info
 
-    def step(self, action):
-        target_player_index, tile_index, number_on_tile = action
+    def step(self, action: int):
+        # action mapping
+        action_copy = deepcopy(action)
+        action_player_index = action_copy % (self._num_players - 1)
+        action_copy = action_copy // (self._num_players - 1)
+        action_tile_color = action_copy % 2
+        action_copy = action_copy // 2
+        action_tile_index = action_copy % self._max_tile_num
+        action_copy = action_copy // self._max_tile_num
+        action_number_on_tile = action_copy % self._max_tile_num
+        action_copy // self._max_tile_num
+        assert action_copy == 0
+
+        # calculate target player index before rolling the observation
+        action_player_index = (action_player_index + self._current_player_index + 1) % (
+            self._num_players - 1
+        )
+
+        # TODO: finish
+
         guess_result = False
         invalid_action = False
 
-        original_index = get_original_index(
-            target_player_index + 2, self._current_player_index, self._num_players
-        )
-
         try:
             guess_result = self.game_host.all_players[self._current_player_index].make_guess(
-                self.game_host.all_players, original_index, tile_index, number_on_tile + 1
+                self.game_host.all_players,
+                action_player_index,
+                action_tile_index,
+                action_number_on_tile,
             )
         except ValueError as e:
-            # print("error", e.args[0])
-            pass
+            if e.args[0] == game.PlayerTileSet.InvalidActionErrorEnum.TILE_ALREADY_PUBLIC:
+                # the model made an invalid guess; give a penalty.
+                invalid_action = True
+                pass
+            else:
+                # there is a logic error.
+                raise
 
         terminated = self.game_host.is_game_over()
         truncated = False
-        if (
-            self._last_action_mask is not None
-            and self._last_action_mask[target_player_index, tile_index, number_on_tile] == 0
-        ):
-            invalid_action = True
-            truncated = True
 
-        reward = self._get_reward()
+        reward = self._get_reward(guess_result, invalid_action)
         observation = self._get_obs()
         info = self._get_info(guess_result, invalid_action)
 
