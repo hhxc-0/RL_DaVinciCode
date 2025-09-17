@@ -15,7 +15,7 @@ class Tile:
         self.color = color
         self.number = number
         self.direction = direction
-        self.history_guesses = []  # List to store historical guesses
+        self.history_guesses = {}  # Dictionary to store historical guesses
 
     def __str__(self) -> str:
         return f"Color: {self.color.name}, Number: {self.number}, Direction: {self.direction.name}"
@@ -26,8 +26,18 @@ class Tile:
         else:
             return f"Color: {self.color.name}, Number: {self.number}"
 
-    def add_guess(self, guess: int) -> None:
-        self.history_guesses.append(guess)
+    def add_history_guess(self, source_player_index: int, number_guessed: int) -> None:
+        if source_player_index not in self.history_guesses.keys():
+            self.history_guesses[source_player_index] = set()
+        self.history_guesses[source_player_index].add(number_guessed)
+
+    def is_guessed(self, source_player_index: int, number_guessed: int) -> bool:
+        if (
+            source_player_index in self.history_guesses.keys()
+            and number_guessed in self.history_guesses[source_player_index]
+        ):
+            return True
+        return False
 
 
 class TableTileSet:
@@ -83,10 +93,11 @@ class PlayerTileSet:
 
     class InvalidActionErrorEnum(Enum):
         TARGET_INDEX_OUT_OF_RANGE = 0
-        TARGET_INDEX_INVALID = 1
+        TARGET_ALREADY_LOST = 1
         TILE_INDEX_OUT_OF_RANGE = 2
         TILE_NUMBER_OUT_OF_RANGE = 3
         TILE_ALREADY_PUBLIC = 4
+        GUESS_ALREADY_MADE = 5
 
     def __init__(self, max_tile_number: int, np_random: np.random.Generator = None) -> None:
         assert max_tile_number and max_tile_number > 0, "Invalid max_tile_number"
@@ -113,12 +124,17 @@ class PlayerTileSet:
             table_tile_set.tile_set.remove(tile)
 
     def make_guess(
-        self, all_players: list, target_index: int, tile_index: int, tile_number: int
+        self,
+        all_players: list,
+        source_player_index: int,
+        target_index: int,
+        tile_index: int,
+        tile_number: int,
     ) -> bool:
         if target_index >= len(all_players) or target_index < 0:
             raise ValueError(self.InvalidActionErrorEnum.TARGET_INDEX_OUT_OF_RANGE)
         if target_index == all_players.index(self) or all_players[target_index].is_lose():
-            raise ValueError(self.InvalidActionErrorEnum.TARGET_INDEX_INVALID)
+            raise ValueError(self.InvalidActionErrorEnum.TARGET_ALREADY_LOST)
         if tile_number < 1 or tile_number > self.max_tile_number:
             raise ValueError(self.InvalidActionErrorEnum.TILE_NUMBER_OUT_OF_RANGE)
         guessTarget = all_players[target_index]
@@ -126,7 +142,7 @@ class PlayerTileSet:
             raise ValueError(self.InvalidActionErrorEnum.TILE_INDEX_OUT_OF_RANGE)
         elif guessTarget.get_tile_list()[tile_index].direction == Tile.Directions.PUBLIC:
             raise ValueError(self.InvalidActionErrorEnum.TILE_ALREADY_PUBLIC)
-        elif guessTarget.verify_guess(tile_index, tile_number):
+        elif guessTarget.verify_guess(source_player_index, tile_index, tile_number):
             return True  # right guess
         else:
             if self.temp_tile != None:
@@ -135,15 +151,17 @@ class PlayerTileSet:
                 self.temp_tile = None
             return False  # wrong guess
 
-    def verify_guess(self, tile_index: int, tile_number: int) -> bool:
+    def verify_guess(self, source_player_index: int, tile_index: int, tile_number: int) -> bool:
         tile = self.get_tile_list()[tile_index]
         if tile.direction == Tile.Directions.PUBLIC:
             raise ValueError(self.InvalidActionErrorEnum.TILE_ALREADY_PUBLIC)
+        if tile.is_guessed(source_player_index, tile_number):
+            raise ValueError(self.InvalidActionErrorEnum.GUESS_ALREADY_MADE)
         if tile.number == tile_number:
             tile.direction = Tile.Directions.PUBLIC
             return True
         else:
-            tile.add_guess(tile_number)  # Add the guess to the history
+            tile.add_history_guess(source_player_index, tile_number)  # Add the guess to the history
             return False
 
     def end_turn(self) -> None:
@@ -214,9 +232,12 @@ class GameHost:
         ]
         return next_player_index
 
+    def get_remaining_players(self) -> list[PlayerTileSet]:
+        return list(player for player in self.all_players if player.is_lose() == False)
+
     def is_game_over(self) -> bool:
-        last_players = list(player for player in self.all_players if player.is_lose() == False)
-        if len(last_players) <= 1:
+        remaining_players = self.get_remaining_players()
+        if len(remaining_players) <= 1:
             return True
         else:
             return False

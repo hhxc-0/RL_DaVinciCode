@@ -222,7 +222,7 @@ class DavinciCodeEnv(gym.Env):
             match e.args[0]:
                 case game.PlayerTileSet.InvalidActionErrorEnum.TARGET_INDEX_OUT_OF_RANGE:
                     invalid_action_penalty = -1.0
-                case game.PlayerTileSet.InvalidActionErrorEnum.TARGET_INDEX_INVALID:
+                case game.PlayerTileSet.InvalidActionErrorEnum.TARGET_ALREADY_LOST:
                     invalid_action_penalty = -0.7
                 case game.PlayerTileSet.InvalidActionErrorEnum.TILE_INDEX_OUT_OF_RANGE:
                     invalid_action_penalty = -1.0

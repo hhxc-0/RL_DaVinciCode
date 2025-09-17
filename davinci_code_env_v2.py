@@ -44,6 +44,31 @@ class DavinciCodeEnv(gym.Env):
 
         self._last_action_mask = None
 
+    def _get_action_mask(self) -> np.ndarray:
+        action_mask = np.zeros(
+            (
+                self._num_players - 1,
+                2 * self._max_tile_num,
+                self._max_tile_num,
+            )
+        )
+        non_self_players = self.game_host.all_players.copy()
+        non_self_players.pop(self._current_player_index)
+        for player_index, player in enumerate(non_self_players):
+            if player_index == self._current_player_index:
+                continue
+            player_tile_list = player.get_tile_list()
+            for tile_index, tile in enumerate(player_tile_list):
+                if tile.direction == game.Tile.Directions.PRIVATE:
+                    action_mask[player_index, tile_index, :] = 1
+                    if self._current_player_index in tile.history_guesses.keys():
+                        action_mask[
+                            player_index,
+                            tile_index,
+                            tile.history_guesses[self._current_player_index],
+                        ] = 0
+        return action_mask.flatten()
+
     def _get_obs(self) -> dict:
         # Part1: main observation of tiles of each player
         def get_tile_obs(tile: game.Tile, force_visible: bool) -> np.ndarray:
@@ -89,36 +114,32 @@ class DavinciCodeEnv(gym.Env):
         )
 
         # Part3: action mask
-        # might not be needed, since whether an action is valid is deducible from the observation.
-        # action_mask = np.zeros(
-        #     (
-        #         self._num_players - 1,
-        #         2 * self._max_tile_num,
-        #         self._max_tile_num,
-        #     )
-        # )
-        # non_self_players = self.game_host.all_players.copy()
-        # non_self_players.pop(self._current_player_index)
-        # for player_index, player in enumerate(non_self_players):
-        #     if player_index == self._current_player_index:
-        #         continue
-        #     player_tile_list = player.get_tile_list()
-        #     for tile_index, tile in enumerate(player_tile_list):
-        #         if tile.direction == game.Tile.Directions.PRIVATE:
-        #             action_mask[player_index][tile_index][:] = 1
+        action_mask = self._get_action_mask()
 
-        return np.concatenate([main_obs.flatten(), temp_tile_obs])
+        return np.concatenate([main_obs.flatten(), temp_tile_obs, action_mask])
 
     def _get_info(self, correct_guess: bool = False, invalid_action: bool = False) -> dict:
         return {
             "current_player_index": self._current_player_index,
             "correct_guess": correct_guess,
             "invalid_action": invalid_action,
+            "action_mask": self._get_action_mask(),
         }
 
-    def _get_reward(self, guess_result: bool, invalid_action: bool):
-        # TODO: Calculate reward
-        raise NotImplementedError
+    def _get_reward(self, correct_guess: bool, invalid_action: bool):
+        won = (
+            len(self.game_host.get_remaining_players()) <= 1
+            and self.game_host.all_players[self._current_player_index]
+            in self.game_host.get_remaining_players()
+        )
+        if invalid_action:
+            return -0.1
+        elif won:
+            return 5
+        elif correct_guess:
+            return 1
+        else:  # incorrect guess
+            return -1
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
@@ -148,48 +169,49 @@ class DavinciCodeEnv(gym.Env):
     def step(self, action: int):
         # action mapping
         action_copy = deepcopy(action)
-        action_player_index = action_copy % (self._num_players - 1)
-        action_copy = action_copy // (self._num_players - 1)
-        action_tile_color = action_copy % 2
-        action_copy = action_copy // 2
-        action_tile_index = action_copy % self._max_tile_num
-        action_copy = action_copy // self._max_tile_num
+        action_player_index = action_copy // ((2 * self._max_tile_num) * self._max_tile_num)
+        action_copy = action_copy % ((2 * self._max_tile_num) * self._max_tile_num)
+        action_tile_index = action_copy // self._max_tile_num
         action_number_on_tile = action_copy % self._max_tile_num
-        action_copy // self._max_tile_num
-        assert action_copy == 0
 
-        # calculate target player index before rolling the observation
-        action_player_index = (action_player_index + self._current_player_index + 1) % (
-            self._num_players - 1
-        )
+        action_number_on_tile += 1
 
-        # TODO: finish
+        # restore the target player's index; undo the rolling.
+        action_player_index = (
+            action_player_index + self._current_player_index + 1
+        ) % self._num_players
 
-        guess_result = False
+        correct_guess = False
         invalid_action = False
 
         try:
-            guess_result = self.game_host.all_players[self._current_player_index].make_guess(
+            correct_guess = self.game_host.all_players[self._current_player_index].make_guess(
                 self.game_host.all_players,
+                self._current_player_index,
                 action_player_index,
                 action_tile_index,
                 action_number_on_tile,
             )
         except ValueError as e:
-            if e.args[0] == game.PlayerTileSet.InvalidActionErrorEnum.TILE_ALREADY_PUBLIC:
-                # the model made an invalid guess; give a penalty.
+            if e.args[0] in [
+                game.PlayerTileSet.InvalidActionErrorEnum.TILE_ALREADY_PUBLIC,
+                game.PlayerTileSet.InvalidActionErrorEnum.TARGET_ALREADY_LOST,
+                game.PlayerTileSet.InvalidActionErrorEnum.GUESS_ALREADY_MADE,
+            ]:
+                # an invalid guess was made; give a penalty.
                 invalid_action = True
-                pass
             else:
                 # there is a logic error.
                 raise
 
+        # TODO: random sample or terminate when invalid action
+
         terminated = self.game_host.is_game_over()
         truncated = False
 
-        reward = self._get_reward(guess_result, invalid_action)
+        reward = self._get_reward(correct_guess, invalid_action)
         observation = self._get_obs()
-        info = self._get_info(guess_result, invalid_action)
+        info = self._get_info(correct_guess, invalid_action)
 
         if self._render_mode == "human":
             self._render_frame()
