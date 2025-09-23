@@ -47,16 +47,12 @@ class DavinciCodeEnv(gym.Env):
     def _get_action_mask(self) -> np.ndarray:
         action_mask = np.zeros(
             (
-                self._num_players - 1,
+                self._num_players,
                 2 * self._max_tile_num,
                 self._max_tile_num,
             )
         )
-        non_self_players = self.game_host.all_players.copy()
-        non_self_players.pop(self._current_player_index)
-        for player_index, player in enumerate(non_self_players):
-            if player_index == self._current_player_index:
-                continue
+        for player_index, player in enumerate(self.game_host.all_players.copy()):
             player_tile_list = player.get_tile_list()
             for tile_index, tile in enumerate(player_tile_list):
                 if tile.direction == game.Tile.Directions.PRIVATE:
@@ -65,8 +61,21 @@ class DavinciCodeEnv(gym.Env):
                         action_mask[
                             player_index,
                             tile_index,
-                            tile.history_guesses[self._current_player_index],
+                            # list(
+                            #     map(
+                            #         lambda x: x - 1,
+                            #         list(tile.history_guesses[self._current_player_index]),
+                            #     )
+                            # ),
+                            # OR
+                            np.array(list(tile.history_guesses[self._current_player_index])) - 1,
                         ] = 0
+
+        # roll the current player to the front
+        action_mask = np.roll(action_mask, shift=-self._current_player_index, axis=0)
+        # remove the current player
+        action_mask = action_mask[1:]
+
         return action_mask.flatten()
 
     def _get_obs(self) -> dict:
@@ -115,6 +124,7 @@ class DavinciCodeEnv(gym.Env):
 
         # Part3: action mask
         action_mask = self._get_action_mask()
+        self._last_action_mask = action_mask
 
         return np.concatenate([main_obs.flatten(), temp_tile_obs, action_mask])
 
@@ -167,19 +177,24 @@ class DavinciCodeEnv(gym.Env):
         return observation, info
 
     def step(self, action: int):
-        # action mapping
-        action_copy = deepcopy(action)
-        action_player_index = action_copy // ((2 * self._max_tile_num) * self._max_tile_num)
-        action_copy = action_copy % ((2 * self._max_tile_num) * self._max_tile_num)
-        action_tile_index = action_copy // self._max_tile_num
-        action_number_on_tile = action_copy % self._max_tile_num
+        def map_action(action: int):
+            # action mapping
+            action_copy = deepcopy(action)
+            action_player_index = action_copy // ((2 * self._max_tile_num) * self._max_tile_num)
+            action_copy = action_copy % ((2 * self._max_tile_num) * self._max_tile_num)
+            action_tile_index = action_copy // self._max_tile_num
+            action_number_on_tile = action_copy % self._max_tile_num
 
-        action_number_on_tile += 1
+            action_number_on_tile += 1
 
-        # restore the target player's index; undo the rolling.
-        action_player_index = (
-            action_player_index + self._current_player_index + 1
-        ) % self._num_players
+            # restore the target player's index; undo the rolling.
+            action_player_index = (
+                action_player_index + self._current_player_index + 1
+            ) % self._num_players
+            return action_player_index, action_tile_index, action_number_on_tile
+
+        action_player_index, action_tile_index, action_number_on_tile = map_action(action)
+        # print(f"mapped action: {map_action(action)}")
 
         correct_guess = False
         invalid_action = False
@@ -204,7 +219,21 @@ class DavinciCodeEnv(gym.Env):
                 # there is a logic error.
                 raise
 
-        # TODO: random sample or terminate when invalid action
+        # random sample when invalid action
+        if invalid_action:
+            action = self.action_space.sample(self._last_action_mask.astype(np.int8))
+            action_player_index, action_tile_index, action_number_on_tile = map_action(action)
+            correct_guess = self.game_host.all_players[self._current_player_index].make_guess(
+                self.game_host.all_players,
+                self._current_player_index,
+                action_player_index,
+                action_tile_index,
+                action_number_on_tile,
+            )
+
+        # modify current player
+        if not correct_guess:
+            self._current_player_index = (self._current_player_index + 1) % self._num_players
 
         terminated = self.game_host.is_game_over()
         truncated = False
