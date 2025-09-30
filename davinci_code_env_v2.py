@@ -143,7 +143,7 @@ class DavinciCodeEnv(gym.Env):
             in self.game_host.get_remaining_players()
         )
         if invalid_action:
-            return -0.1
+            return -0.5
         elif won:
             return 5
         elif correct_guess:
@@ -212,6 +212,9 @@ class DavinciCodeEnv(gym.Env):
                 game.PlayerTileSet.InvalidActionErrorEnum.TILE_ALREADY_PUBLIC,
                 game.PlayerTileSet.InvalidActionErrorEnum.TARGET_ALREADY_LOST,
                 game.PlayerTileSet.InvalidActionErrorEnum.GUESS_ALREADY_MADE,
+                game.PlayerTileSet.InvalidActionErrorEnum.TILE_INDEX_OUT_OF_RANGE,
+                game.PlayerTileSet.InvalidActionErrorEnum.TILE_NUMBER_OUT_OF_RANGE,
+                game.PlayerTileSet.InvalidActionErrorEnum.TARGET_INDEX_OUT_OF_RANGE,
             ]:
                 # an invalid guess was made; give a penalty.
                 invalid_action = True
