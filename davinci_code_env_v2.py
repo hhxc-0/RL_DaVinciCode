@@ -143,13 +143,13 @@ class DavinciCodeEnv(gym.Env):
             in self.game_host.get_remaining_players()
         )
         if invalid_action:
-            return -0.5
+            return -0.1
         elif won:
             return 5
         elif correct_guess:
             return 1
         else:  # incorrect guess
-            return -1
+            return 0
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
