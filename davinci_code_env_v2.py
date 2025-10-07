@@ -236,7 +236,15 @@ class DavinciCodeEnv(gym.Env):
 
         # modify current player
         if not correct_guess:
-            self._current_player_index = (self._current_player_index + 1) % self._num_players
+            self._current_player_index = self.game_host.get_next_player_index(
+                self._current_player_index
+            )  # Update the current player index to the next player
+            try:
+                self.game_host.all_players[self._current_player_index].draw_tile(
+                    self.game_host.table_tile_set
+                )
+            except:
+                pass
 
         terminated = self.game_host.is_game_over()
         truncated = False
