@@ -10,7 +10,7 @@ import torch
 from torch import nn
 import gymnasium as gym
 from actor_critic import ActorCritic
-import davinci_code_env_v1
+import davinci_code_env_v2
 
 
 class App:
@@ -60,15 +60,13 @@ class App:
                 raise ValueError
 
     def init_game(self) -> None:
-        self.env = gym.wrappers.FlattenObservation(
-            gym.make(
-                "DavinciCode-v1",
-                # max_episode_steps=100,
-                num_players=NUMBER_OF_PLAYERS,
-                # initial_player=0,
-                max_tile_num=MAX_TILE_NUMBER,
-                initial_tiles=INITIAL_TILES,
-            )
+        self.env = gym.make(
+            "DavinciCode-v2",
+            # max_episode_steps=100,
+            num_players=NUMBER_OF_PLAYERS,
+            # initial_player=0,
+            max_tile_num=MAX_TILE_NUMBER,
+            initial_tiles=INITIAL_TILES,
         )
         self.env.reset()
         self.game_stage = self.GameStage.INTERACTING
@@ -250,13 +248,16 @@ class App:
                         self.app_self.store_session()
                         st.rerun()
 
-                    obs, _, terminated, truncated, info = self.app_self.env.step(
-                        [
-                            other_players.index(other_player),
-                            tile_buttons[other_player],
-                            guess_number - 1,
-                        ]
+                    action_player_index = other_players.index(other_player)
+                    action_tile_index = tile_buttons[other_player]
+                    action_number_on_tile = guess_number - 1
+                    max_tile_num = self.app_self.env.unwrapped._max_tile_num
+                    action = (
+                        action_player_index * (2 * max_tile_num * max_tile_num)
+                        + action_tile_index * max_tile_num
+                        + action_number_on_tile
                     )
+                    obs, _, terminated, truncated, info = self.app_self.env.step(action)
                     if info["invalid_action"]:
                         st.markdown(
                             '### <font color="red">Invalid guess</font>',
@@ -265,18 +266,10 @@ class App:
                         st.rerun()
                     human_correct_guess = info["correct_guess"]
 
-                    while self.app_self.env.unwrapped.current_player_index != HUMAN_PLAYER_INDEX:
-                        dist = model.forward(torch.FloatTensor(obs).to(device))[0]
-                        action = [dist_single.sample() for dist_single in dist]
-                        obs, _, terminated, truncated, info = self.app_self.env.step(
-                            [single_action.cpu().numpy() for single_action in action]
-                        )
-
-                        # When the model makes an invalid action, randomly sample one of the valid actions
-                        if info["invalid_action"]:
-                            available_actions = np.where(obs[1] == 1)[0]
-                            sampled_action = np.random.choice(available_actions)
-                            self.app_self.env.step(sampled_action)
+                    while self.app_self.env.unwrapped._current_player_index != HUMAN_PLAYER_INDEX:
+                        dist, _ = model(torch.FloatTensor(obs).to(device))
+                        action = dist.sample()
+                        obs, _, terminated, truncated, info = self.app_self.env.step(action.cpu().numpy())
 
                         if terminated or truncated:
                             break
